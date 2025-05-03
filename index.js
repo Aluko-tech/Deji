@@ -10,6 +10,13 @@ app.get('/', (req, res) => {
   res.send('Deji WhatsApp Webhook is live!');
 });
 
+const express = require('express');
+const bodyParser = require('body-parser');
+require('dotenv').config();
+
+const app = express();
+app.use(bodyParser.json());
+
 // Webhook verification
 app.get('/webhook', (req, res) => {
     const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
