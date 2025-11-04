@@ -1,0 +1,38 @@
+{
+  "common": {
+    "app_name": "Deji API",
+    "welcome": "Barka da zuwa, {{name}}!",
+    "logout_success": "Ka fita lafiya."
+  },
+  "auth": {
+    "login_success": "An shiga cikin nasara.",
+    "invalid_credentials": "Adireshin imel ko kalmar sirri ba daidai ba.",
+    "signup_success": "An ƙirƙiri asusu cikin nasara.",
+    "token_missing": "Ba a bayar da token ba.",
+    "token_invalid": "Token ya ƙare ko ba daidai ba.",
+    "unauthorized": "Ba ka da izinin samun wannan albarkatun."
+  },
+  "contacts": {
+    "created": "An ƙirƙiri lamba cikin nasara.",
+    "updated": "An sabunta lamba cikin nasara.",
+    "deleted": "An goge lamba cikin nasara.",
+    "not_found": "Ba a sami lambar ba."
+  },
+  "invoices": {
+    "created": "An ƙirƙiri invoice cikin nasara.",
+    "updated": "An sabunta invoice cikin nasara.",
+    "deleted": "An goge invoice cikin nasara.",
+    "paid": "An biya invoice.",
+    "not_found": "Ba a sami invoice ba."
+  },
+  "payments": {
+    "created": "An rubuta biyan kuɗi cikin nasara.",
+    "failed": "Biyan kuɗi ya gaza.",
+    "not_found": "Ba a sami biyan kuɗi ba."
+  },
+  "subscriptions": {
+    "upgraded": "An haɓaka biyan kuɗin zuwa {{plan}} cikin nasara.",
+    "expired": "Biyan kuɗin ku ya ƙare. Da fatan za a sabunta.",
+    "limit_exceeded": "Kun wuce iyakar tsarin ku."
+  }
+}

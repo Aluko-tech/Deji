@@ -1,0 +1,52 @@
+{
+  "common": {
+    "app_name": "Deji API",
+    "welcome": "¡Bienvenido, {{name}}!",
+    "logout_success": "Has cerrado sesión correctamente."
+  },
+  "auth": {
+    "login_success": "Inicio de sesión exitoso.",
+    "invalid_credentials": "Correo electrónico o contraseña incorrectos.",
+    "signup_success": "Cuenta creada con éxito.",
+    "token_missing": "No se proporcionó token.",
+    "token_invalid": "Token inválido o expirado.",
+    "unauthorized": "No está autorizado para acceder a este recurso."
+  },
+  "contacts": {
+    "created": "Contacto creado con éxito.",
+    "updated": "Contacto actualizado con éxito.",
+    "deleted": "Contacto eliminado con éxito.",
+    "not_found": "Contacto no encontrado."
+  },
+  "invoices": {
+    "created": "Factura creada con éxito.",
+    "updated": "Factura actualizada con éxito.",
+    "deleted": "Factura eliminada con éxito.",
+    "paid": "Factura marcada como pagada.",
+    "not_found": "Factura no encontrada."
+  },
+  "payments": {
+    "created": "Pago registrado con éxito.",
+    "failed": "Error en el pago.",
+    "not_found": "Pago no encontrado."
+  },
+  "ledger": {
+    "entry_added": "Entrada agregada al libro mayor.",
+    "entry_updated": "Entrada actualizada en el libro mayor."
+  },
+  "subscriptions": {
+    "upgraded": "Suscripción actualizada a {{plan}} con éxito.",
+    "expired": "Tu suscripción ha expirado. Por favor, renuévala.",
+    "limit_exceeded": "Has superado el límite de tu plan."
+  },
+  "notifications": {
+    "sent": "Notificación enviada con éxito.",
+    "preferences_updated": "Preferencias de notificación actualizadas.",
+    "no_logs": "No se encontraron registros de notificación."
+  },
+  "errors": {
+    "internal_error": "Ocurrió un error interno del servidor.",
+    "forbidden": "Prohibido: permisos insuficientes.",
+    "not_found": "El recurso solicitado no fue encontrado."
+  }
+}

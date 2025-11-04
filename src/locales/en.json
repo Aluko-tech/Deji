@@ -1,0 +1,52 @@
+{
+  "common": {
+    "app_name": "Deji API",
+    "welcome": "Welcome, {{name}}!",
+    "logout_success": "You have been logged out successfully."
+  },
+  "auth": {
+    "login_success": "Login successful.",
+    "invalid_credentials": "Invalid email or password.",
+    "signup_success": "Account created successfully.",
+    "token_missing": "No token provided.",
+    "token_invalid": "Invalid or expired token.",
+    "unauthorized": "You are not authorized to access this resource."
+  },
+  "contacts": {
+    "created": "Contact created successfully.",
+    "updated": "Contact updated successfully.",
+    "deleted": "Contact deleted successfully.",
+    "not_found": "Contact not found."
+  },
+  "invoices": {
+    "created": "Invoice created successfully.",
+    "updated": "Invoice updated successfully.",
+    "deleted": "Invoice deleted successfully.",
+    "paid": "Invoice marked as paid.",
+    "not_found": "Invoice not found."
+  },
+  "payments": {
+    "created": "Payment recorded successfully.",
+    "failed": "Payment failed.",
+    "not_found": "Payment not found."
+  },
+  "ledger": {
+    "entry_added": "Ledger entry added.",
+    "entry_updated": "Ledger entry updated."
+  },
+  "subscriptions": {
+    "upgraded": "Subscription upgraded to {{plan}} successfully.",
+    "expired": "Your subscription has expired. Please renew.",
+    "limit_exceeded": "You have exceeded your plan limit."
+  },
+  "notifications": {
+    "sent": "Notification sent successfully.",
+    "preferences_updated": "Notification preferences updated.",
+    "no_logs": "No notification logs found."
+  },
+  "errors": {
+    "internal_error": "An internal server error occurred.",
+    "forbidden": "Forbidden: insufficient permissions.",
+    "not_found": "The requested resource was not found."
+  }
+}

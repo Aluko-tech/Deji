@@ -1,0 +1,52 @@
+{
+  "common": {
+    "app_name": "Deji API",
+    "welcome": "Bienvenue, {{name}}!",
+    "logout_success": "Vous vous êtes déconnecté avec succès."
+  },
+  "auth": {
+    "login_success": "Connexion réussie.",
+    "invalid_credentials": "Email ou mot de passe invalide.",
+    "signup_success": "Compte créé avec succès.",
+    "token_missing": "Aucun jeton fourni.",
+    "token_invalid": "Jeton invalide ou expiré.",
+    "unauthorized": "Vous n'êtes pas autorisé à accéder à cette ressource."
+  },
+  "contacts": {
+    "created": "Contact créé avec succès.",
+    "updated": "Contact mis à jour avec succès.",
+    "deleted": "Contact supprimé avec succès.",
+    "not_found": "Contact introuvable."
+  },
+  "invoices": {
+    "created": "Facture créée avec succès.",
+    "updated": "Facture mise à jour avec succès.",
+    "deleted": "Facture supprimée avec succès.",
+    "paid": "Facture marquée comme payée.",
+    "not_found": "Facture introuvable."
+  },
+  "payments": {
+    "created": "Paiement enregistré avec succès.",
+    "failed": "Échec du paiement.",
+    "not_found": "Paiement introuvable."
+  },
+  "ledger": {
+    "entry_added": "Entrée ajoutée au grand livre.",
+    "entry_updated": "Entrée mise à jour dans le grand livre."
+  },
+  "subscriptions": {
+    "upgraded": "Abonnement mis à niveau vers {{plan}} avec succès.",
+    "expired": "Votre abonnement a expiré. Veuillez le renouveler.",
+    "limit_exceeded": "Vous avez dépassé la limite de votre plan."
+  },
+  "notifications": {
+    "sent": "Notification envoyée avec succès.",
+    "preferences_updated": "Préférences de notification mises à jour.",
+    "no_logs": "Aucun journal de notification trouvé."
+  },
+  "errors": {
+    "internal_error": "Une erreur interne du serveur s'est produite.",
+    "forbidden": "Interdit : autorisations insuffisantes.",
+    "not_found": "La ressource demandée est introuvable."
+  }
+}

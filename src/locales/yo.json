@@ -1,0 +1,38 @@
+{
+  "common": {
+    "app_name": "Deji API",
+    "welcome": "Kaabọ, {{name}}!",
+    "logout_success": "O ti jade ni aṣeyọri."
+  },
+  "auth": {
+    "login_success": "Wíwọlé ṣeyọri.",
+    "invalid_credentials": "Imeeli tàbí ọrọ aṣínà kò tọ́.",
+    "signup_success": "A dá àkọọlẹ́ rẹ̀ sílẹ̀ ní aṣeyọri.",
+    "token_missing": "Ko si token tí a fi pèsè.",
+    "token_invalid": "Token ti pari tabi ko tọ́.",
+    "unauthorized": "O kò ní àṣẹ láti wọle sí oríṣìíríṣìí yìí."
+  },
+  "contacts": {
+    "created": "Olubasọrọ ṣẹda ni aṣeyọri.",
+    "updated": "Olubasọrọ ṣe imudojuiwọn ni aṣeyọri.",
+    "deleted": "Olubasọrọ paarẹ ni aṣeyọri.",
+    "not_found": "A kò rí olubasọrọ naa."
+  },
+  "invoices": {
+    "created": "Fàkúrà ṣẹda ni aṣeyọri.",
+    "updated": "Fàkúrà ṣe imudojuiwọn ni aṣeyọri.",
+    "deleted": "Fàkúrà paarẹ ni aṣeyọri.",
+    "paid": "Fàkúrà ti san.",
+    "not_found": "A kò rí fàkúrà naa."
+  },
+  "payments": {
+    "created": "Ìsanwó ṣàfihàn ni aṣeyọri.",
+    "failed": "Ìsanwó kuna.",
+    "not_found": "A kò rí ìsanwó naa."
+  },
+  "subscriptions": {
+    "upgraded": "Ìforúkọsílẹ́ rẹ̀ ti gòkè sí {{plan}}.",
+    "expired": "Ìforúkọsílẹ́ rẹ̀ ti pari. Jọwọ tún un ṣe.",
+    "limit_exceeded": "O ti kọjá ààlà ètò rẹ."
+  }
+}

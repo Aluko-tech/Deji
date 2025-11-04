@@ -1,0 +1,428 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id               String            @id @default(uuid())
+  name             String            @unique
+  language       String   @default("en") // 🌍 Default tenant language
+  users            User[]
+  contacts         Contact[]
+  products         Product[]
+  leads            Lead[]
+  invoices         Invoice[]
+  settings         TenantSettings?
+  whatsappMessages WhatsAppMessage[]
+  lowStockAlerts   LowStockAlert[]
+  stockAuditLogs   StockAuditLog[]
+  subscriptions    Subscription[]
+
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @default(now()) @updatedAt
+  Tag                     Tag[]
+  Payment                 Payment[]
+  ledgerEntries           LedgerEntry[]
+  auditLogs               AuditLog[]
+  notificationPreferences NotificationPreference[]
+  notificationLogs        NotificationLog[]
+  customFields            CustomField[] // one-to-many relation to CustomField
+}
+
+model User {
+  id        String     @id @default(uuid())
+  email     String     @unique
+  password  String
+  role      String // 'admin' or 'staff'
+  tenantId  String
+  tenant    Tenant     @relation(fields: [tenantId], references: [id])
+  language       String?  // Optional user language
+  createdAt DateTime   @default(now())
+  auditLogs AuditLog[]
+  refreshToken String?
+}
+
+model Contact {
+  id               String            @id @default(uuid())
+  name             String
+  email            String            @unique
+  phone            String?
+  tenantId         String
+  invoices         Invoice[]
+  whatsappMessages WhatsAppMessage[]
+  tenant           Tenant            @relation(fields: [tenantId], references: [id])
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  tags Tag[] @relation("ContactTags")
+
+  @@index([tenantId])
+}
+
+model Tag {
+  id        String    @id @default(uuid())
+  name      String
+  tenantId  String
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+  contacts  Contact[] @relation("ContactTags")
+  leads     Lead[]    @relation("LeadTags") //
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([name, tenantId])
+}
+
+model Product {
+  id                String      @id @default(uuid())
+  name              String
+  description       String?
+  price             Float
+  currency          String      @default("NGN")
+  type              ProductType
+  unit              String?
+  stock             Int         @default(0)
+  lowStockThreshold Int         @default(5) // ✅ Customizable threshold
+  customFields      Json? // ✅ Optional JSON custom fields
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  lineItems      LineItem[] // ✅ Invoice/Order associations
+  lowStockAlerts LowStockAlert[] // ✅ For low stock notifications
+  stockAuditLogs StockAuditLog[] // ✅ For tracking stock changes
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([tenantId])
+}
+
+enum ProductType {
+  product
+  service
+}
+
+model LowStockAlert {
+  id        String   @id @default(uuid())
+  tenantId  String
+  productId String
+  message   String
+  sentVia   String // e.g. 'whatsapp', 'email'
+  sentAt    DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id])
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+}
+
+model StockAuditLog {
+  id          String   @id @default(uuid())
+  tenantId    String
+  productId   String
+  changeType  String // 'deduct', 'restock', 'manual'
+  oldValue    Int
+  newValue    Int
+  triggeredBy String? // userId or 'system'
+  createdAt   DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id])
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+}
+
+model Lead {
+  id        String   @id @default(uuid())
+  name      String
+  email     String?  @unique
+  phone     String?
+  company   String?
+  status    String   @default("Lead") // Lead, Prospect, Client, etc.
+  source    String? // Referral, Web, Social Media, etc.
+  notes     String?
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  tags      Tag[]    @relation("LeadTags")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  
+  @@unique([tenantId, email]) // per-tenant email uniqueness
+}
+
+model Invoice {
+  id            String        @id @default(uuid())
+  tenantId      String
+  tenant        Tenant        @relation(fields: [tenantId], references: [id])
+  contactId     String
+  contact       Contact       @relation(fields: [contactId], references: [id])
+  invoiceNumber String        @unique
+  payments      Payment[]
+  issueDate     DateTime
+  dueDate       DateTime
+  status        InvoiceStatus @default(PENDING)
+
+  lineItems LineItem[] @relation("InvoiceLineItems")
+
+  subtotal Float
+  tax      Float
+  discount Float
+  total    Float
+  currency String @default("NGN")
+
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model LineItem {
+  id          String   @id @default(uuid())
+  invoiceId   String
+  invoice     Invoice  @relation("InvoiceLineItems", fields: [invoiceId], references: [id])
+  productId   String?
+  product     Product? @relation(fields: [productId], references: [id])
+  description String
+  quantity    Int
+  unitPrice   Float
+  total       Float
+}
+
+enum InvoiceStatus {
+  PENDING
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+model Payment {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id])
+
+  amount Float
+  method String
+  status PaymentStatus
+  note   String? // optional note
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum PaymentStatus {
+  PAID
+  PARTIALLY_PAID
+  FAILED
+}
+
+model WhatsAppMessage {
+  id         String           @id @default(uuid())
+  tenantId   String
+  tenant     Tenant           @relation(fields: [tenantId], references: [id])
+  contactId  String
+  contact    Contact          @relation(fields: [contactId], references: [id])
+  message    String
+  direction  MessageDirection @default(OUTGOING) // NEW: OUTGOING or INCOMING
+  status     MessageStatus    @default(PENDING)
+  messageId  String? // NEW: Meta WhatsApp Cloud API message ID
+  error      String? // NEW: error details if failed
+  sentAt     DateTime? // Sent timestamp (OUTGOING only)
+  receivedAt DateTime? // Optional future use (for replies)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+}
+
+enum MessageStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum MessageDirection {
+  OUTGOING
+  INCOMING
+}
+
+model LedgerEntry {
+  id          String     @id @default(cuid())
+  tenantId    String
+  type        LedgerType
+  amount      Decimal
+  description String
+  accountId   String
+  account     Account    @relation(fields: [accountId], references: [id])
+  reference   String? // Could be an invoiceId or paymentId
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  tenant      Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model Account {
+  id        String        @id @default(cuid())
+  tenantId  String
+  name      String
+  type      AccountType
+  entries   LedgerEntry[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+enum LedgerType {
+  INCOME
+  EXPENSE
+}
+
+enum AccountType {
+  REVENUE
+  EXPENSE
+  ASSET
+  LIABILITY
+}
+
+model TenantSettings {
+  id               String   @id @default(cuid())
+  tenantId         String   @unique
+  businessName     String?
+  logoUrl          String?
+  primaryColor     String?  @default("#000000") // Branding default black
+  currency         String?  @default("NGN") // Default to Nigerian Naira
+  language         String?  @default("en") // English default
+  timezone         String?  @default("Africa/Lagos")
+  invoicePrefix    String?  @default("INV-")
+  invoiceStart     Int?     @default(1000)
+  invoiceNote      String?
+  invoiceDueDays   Int?     @default(30)
+  taxRate          Float?   @default(0.0) // default no tax
+  notifyByEmail    Boolean  @default(true)
+  notifyByWhatsApp Boolean  @default(true)
+  phoneNumber      String?
+  emailAddress     String?
+  address          String?
+  website          String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_settings")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  tenantId  String
+  userId    String?
+  action    String // e.g., "CREATE_CONTACT", "DELETE_PRODUCT"
+  model     String // e.g., "Contact", "Product"
+  modelId   String? // ID of the affected record
+  details   Json? // Optional: snapshot or message
+  createdAt DateTime @default(now())
+
+  // Relations
+  user   User?  @relation(fields: [userId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}
+
+model NotificationPreference {
+  id               String   @id @default(cuid())
+  tenantId         String   @unique
+  notifyByEmail    Boolean  @default(true)
+  notifyByWhatsApp Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model NotificationLog {
+  id        String   @id @default(cuid())
+  tenantId  String
+  type      String // e.g. 'LOW_STOCK_ALERT', 'INVOICE_REMINDER'
+  channel   String // 'email' or 'whatsapp'
+  recipient String // email address or phone number
+  content   String // message content or subject+body JSON stringified
+  success   Boolean
+  error     String? // if any error message
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model CustomField {
+  id                String             @id @default(cuid())
+  tenantId          String
+  entity            String // e.g. "Contact", "Product", "Invoice"
+  name              String // Field name (unique per tenant + entity)
+  type              String // "string", "number", "date", "boolean", "select"
+  required          Boolean            @default(false)
+  options           String? // JSON stringified array for select options
+  defaultValue      String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  customFieldValues CustomFieldValue[] // one-to-many relation to CustomFieldValue
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, entity, name])
+}
+
+model CustomFieldValue {
+  id            String   @id @default(cuid())
+  customFieldId String
+  entityId      String // ID of the record (Contact/Product/Invoice id)
+  value         String? // Store as string for simplicity
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  customField CustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+
+  @@unique([customFieldId, entityId])
+}
+
+model CurrencyRate {
+  id        String   @id @default(cuid())
+  base      String // e.g., "USD"
+  target    String // e.g., "EUR"
+  rate      Float
+  fetchedAt DateTime @default(now())
+
+  @@unique([base, target])
+}
+
+// ==========================
+// Enums
+// ==========================
+enum Plan {
+  FREE
+  PRO
+  BUSINESS
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+// ==========================
+// Models
+// ==========================
+model Subscription {
+  id                 String             @id @default(cuid())
+  tenantId           String             @unique
+  plan               Plan               @default(FREE)
+  status             SubscriptionStatus @default(ACTIVE)
+  startedAt          DateTime           @default(now())
+  currentPeriodStart DateTime           @default(now())
+  currentPeriodEnd   DateTime // set per plan (e.g., +30 days)
+  cancelAtPeriodEnd  Boolean            @default(false)
+  trialEndsAt        DateTime?
+  metadata           Json?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
