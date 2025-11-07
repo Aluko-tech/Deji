@@ -2,36 +2,43 @@
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
-import routes from "./src/routes/index.js";
-import { startCurrencyRateJob } from "./src/jobs/currencyRates.job.js";
 import path from "path";
 import { fileURLToPath } from "url";
+
+// ✅ Import app modules (must also use ESM syntax inside them)
+import routes from "./src/routes/index.js";
+import { startCurrencyRateJob } from "./src/jobs/currencyRates.job.js";
 
 dotenv.config();
 
 const app = express();
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ✅ Explicit allowed origins (frontend + backend + env)
+// ✅ Allowed CORS origins
 const allowedOrigins = [
   "http://localhost:5173",
   "http://127.0.0.1:5173",
-  "https://dejiapi.online",         // frontend domain
-  "https://www.dejiapi.online",     // optional www
-  "https://deji-api.onrender.com",  // backend render domain
-  process.env.CLIENT_URL,           // fallback from .env
+  "https://dejiapi.online",
+  "https://www.dejiapi.online",
+  "https://deji-api.onrender.com",
+  process.env.CLIENT_URL, // fallback from .env
 ].filter(Boolean);
 
-// ✅ CORS configuration
+// ✅ CORS middleware
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (allowedOrigins.includes(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
   }
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+  );
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization"
+  );
   res.setHeader("Access-Control-Allow-Credentials", "true");
 
   if (req.method === "OPTIONS") {
@@ -41,11 +48,11 @@ app.use((req, res, next) => {
   next();
 });
 
-// ✅ Middleware
+// ✅ Core middleware
 app.use(express.json({ limit: "10mb" }));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// 🌍 Locale middleware
+// 🌍 Locale detection
 app.use((req, res, next) => {
   req.locale =
     req.headers["accept-language"]?.split(",")[0]?.trim().slice(0, 2) || "en";
@@ -62,21 +69,29 @@ app.get("/api/healthz", (req, res) => {
   });
 });
 
-// ✅ Routes
+// ✅ Main routes
 app.use("/api", routes);
 
-// ✅ Background job
-if (typeof startCurrencyRateJob === "function") {
-  startCurrencyRateJob();
+// ✅ Background job (safe guard)
+try {
+  if (typeof startCurrencyRateJob === "function") {
+    startCurrencyRateJob();
+  }
+} catch (err) {
+  console.error("⚠️ Failed to start currency rate job:", err.message);
 }
 
 // ✅ Global error handler
 app.use((err, req, res, next) => {
-  console.error("❌ Error:", err.message);
+  console.error("❌ Error:", err.stack);
   if (err.message === "Not allowed by CORS") {
-    return res.status(403).json({ message: "CORS policy: origin not allowed." });
+    return res.status(403).json({
+      message: "CORS policy: origin not allowed.",
+    });
   }
-  res.status(500).json({ error: "Internal Server Error" });
+  res.status(500).json({
+    error: "Internal Server Error",
+  });
 });
 
 // ✅ Start server
