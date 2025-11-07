@@ -26,9 +26,8 @@ import uploadRoutes from "./upload.routes.js";
 
 import { authenticate } from "../middleware/auth.js";
 import { localeMiddleware } from "../middleware/locale.middleware.js";
-import express from "express";
 
-const router = express.Router();
+const router = Router();
 
 // ✅ Public/unprotected
 router.use("/auth", authRoutes);
