@@ -171,8 +171,9 @@ model Invoice {
   total    Float
   currency String @default("NGN")
 
-  notes     String?
-  createdAt DateTime @default(now())
+  notes          String?
+  idempotencyKey String?
+  createdAt      DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
@@ -190,6 +191,7 @@ model LineItem {
 
 enum InvoiceStatus {
   PENDING
+  PARTIALLY_PAID
   PAID
   OVERDUE
   CANCELLED
@@ -206,7 +208,8 @@ model Payment {
   amount Float
   method String
   status PaymentStatus
-  note   String? // optional note
+  note           String? // optional note
+  idempotencyKey String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
