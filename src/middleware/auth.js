@@ -59,8 +59,9 @@ export const authenticate = async (req, res, next) => {
  * ✅ Authorize Middleware — restricts route to specific roles
  */
 export const authorize = (...allowedRoles) => {
+  const flattenedRoles = allowedRoles.flat();
   return (req, res, next) => {
-    if (!req.user || !allowedRoles.includes(req.user.role)) {
+    if (!req.user || !flattenedRoles.includes(req.user.role)) {
       return res.status(403).json({ message: "Forbidden: insufficient permissions." });
     }
     next();
