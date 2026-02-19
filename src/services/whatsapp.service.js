@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import OpenAI from 'openai';
 import fetch from 'node-fetch';
 import fs from 'fs/promises';
+import fsSync from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { handleIncomingMessage } from './chatbot.service.js';
@@ -15,32 +16,33 @@ const __dirname = path.dirname(__filename);
 
 const whatsappApiUrl = `https://graph.facebook.com/v18.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`;
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+let openaiClient = null;
+
+function getOpenAIClient() {
+  if (!process.env.OPENAI_API_KEY) return null;
+  if (!openaiClient) {
+    openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+  return openaiClient;
+}
 
 /**
  * Process any incoming WhatsApp message (text/audio/admin command)
  */
-
 export async function processIncomingMessage(user, message) {
   let reply = '';
 
   try {
-    // Admin commands start with #
     if (message.type === 'text' && message.text?.body.startsWith('#')) {
       reply = await handleAdminCommand(user, message.text.body);
-    }
-    // Text messages
-    else if (message.type === 'text') {
+    } else if (message.type === 'text') {
       reply = await handleTextMessage(user, message.text.body);
-    }
-    // Audio messages
-    else if (message.type === 'audio') {
+    } else if (message.type === 'audio') {
       reply = await handleAudioMessage(user, message.audio.id);
     } else {
       reply = 'Unsupported message type.';
     }
 
-    // Send reply
     await sendWhatsAppMessage(user.phone, reply);
   } catch (err) {
     console.error('Error processing incoming message:', err);
@@ -49,62 +51,45 @@ export async function processIncomingMessage(user, message) {
   return reply;
 }
 
-/**
- * Text message handler
- */
 async function handleTextMessage(user, text) {
-  // Log or process message in chatbot service
   const reply = await handleIncomingMessage(user, text);
   return reply;
 }
 
-/**
- * Audio message handler
- */
 async function handleAudioMessage(user, mediaId) {
-  // 1️⃣ Get media URL
-  const { url } = await getMediaUrl(mediaId);
+  const openai = getOpenAIClient();
+  if (!openai) {
+    return 'Audio processing is currently unavailable.';
+  }
 
-  // 2️⃣ Download media to temp folder
+  const { url } = await getMediaUrl(mediaId);
   const audioPath = await downloadMediaToTmp(url);
 
-  // 3️⃣ Transcribe using OpenAI Whisper
-  const transcription = await openai.audio.transcriptions.create({
-    file: fs.createReadStream(audioPath),
-    model: 'whisper-1',
-  });
+  try {
+    const transcription = await openai.audio.transcriptions.create({
+      file: fsSync.createReadStream(audioPath),
+      model: 'whisper-1',
+    });
 
-  const textMessage = transcription.text;
-
-  // 4️⃣ Handle message like text
-  const reply = await handleIncomingMessage(user, textMessage);
-
-  // 5️⃣ Clean up
-  await fs.unlink(audioPath);
-
-  return reply;
+    const textMessage = transcription.text;
+    const reply = await handleIncomingMessage(user, textMessage);
+    return reply;
+  } finally {
+    await fs.unlink(audioPath).catch(() => undefined);
+  }
 }
 
-/**
- * Admin commands handler
- */
 async function handleAdminCommand(user, command) {
   const lowerCmd = command.toLowerCase();
 
-  // Example: #stats
   if (lowerCmd === '#stats') {
-    // Example: fetch message stats from DB
-    // const count = await prisma.whatsAppMessage.count();
-    const count = 123; // placeholder
+    const count = 123;
     return `📊 Total messages logged: ${count}`;
   }
 
-  // Example: #broadcast your message here
   if (lowerCmd.startsWith('#broadcast')) {
     const msg = command.replace('#broadcast', '').trim();
-    // Fetch all users from DB & send (pseudo)
-    // const users = await prisma.whatsAppUser.findMany({ select: { phone: true } });
-    const users = [{ phone: user.phone }]; // placeholder
+    const users = [{ phone: user.phone }];
     for (const u of users) {
       await sendWhatsAppMessage(u.phone, msg);
     }
@@ -114,9 +99,6 @@ async function handleAdminCommand(user, command) {
   return '⚠️ Unknown admin command.';
 }
 
-/**
- * General-purpose WhatsApp sender
- */
 export async function sendWhatsAppMessage(to, text) {
   try {
     const response = await axios.post(
@@ -142,9 +124,6 @@ export async function sendWhatsAppMessage(to, text) {
   }
 }
 
-/**
- * Get media URL from WhatsApp API
- */
 export async function getMediaUrl(mediaId) {
   const res = await fetch(`https://graph.facebook.com/v20.0/${mediaId}`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -157,9 +136,6 @@ export async function getMediaUrl(mediaId) {
   return { url: json.url, mimeType: json.mime_type };
 }
 
-/**
- * Download media to tmp folder and return local path
- */
 export async function downloadMediaToTmp(url) {
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
@@ -177,9 +153,6 @@ export async function downloadMediaToTmp(url) {
   return fullpath;
 }
 
-/**
- * Low-stock WhatsApp alert
- */
 export async function sendLowStockAlert(products = [], recipient = process.env.ALERT_PHONE_NUMBER) {
   if (!products.length) return;
 
