@@ -61,12 +61,15 @@ export default function App() {
 
         <Route path="products" element={<ProductList />} />
         <Route path="products/new" element={<ProductForm />} />
+        <Route path="products/:id/edit" element={<ProductForm />} />
 
         <Route path="invoices" element={<InvoiceList />} />
         <Route path="invoices/new" element={<InvoiceForm />} />
+        <Route path="invoices/:id" element={<InvoiceForm />} />
 
         <Route path="payments" element={<PaymentList />} />
         <Route path="payments/new" element={<PaymentForm />} />
+        <Route path="payments/:id/edit" element={<PaymentForm />} />
 
         <Route path="inventory" element={<StockList />} />
         <Route path="inventory/low-stock" element={<LowStockAlerts />} />

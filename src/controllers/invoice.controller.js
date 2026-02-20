@@ -5,51 +5,86 @@ import {
   updateInvoiceService,
   deleteInvoiceService,
 } from '../services/invoice.service.js';
+import { logAudit } from '../services/auditLog.service.js';
 import { generateInvoicePDF } from '../utils/pdfGenerator.js';
 
 export const createInvoice = async (req, res) => {
   try {
-    const invoice = await createInvoiceWithStock(req.user.tenantId, { ...req.body, userId: req.user.id });
-    res.status(201).json({ success: true, message: 'Invoice created successfully', data: invoice });
+    const invoice = await createInvoiceWithStock(req.tenantId, { ...req.body, userId: req.userId });
+    
+    await logAudit({
+      tenantId: req.tenantId,
+      userId: req.userId,
+      action: 'CREATE_INVOICE',
+      model: 'Invoice',
+      modelId: invoice.id,
+      details: { invoiceNumber: invoice.invoiceNumber, total: invoice.total },
+    });
+
+    res.status(201).json({ success: true, data: invoice });
   } catch (error) {
-    res.status(400).json({ success: false, message: error.message || 'Failed to create invoice', data: null });
+    console.error('❌ Create Invoice Error:', error);
+    res.status(400).json({ success: false, error: error.message });
   }
 };
 
 export const getInvoices = async (req, res) => {
   try {
-    const invoices = await getInvoicesService(req.user.tenantId, req.query);
-    res.json({ success: true, message: 'Invoices fetched successfully', data: invoices });
+    const invoices = await getInvoicesService(req.tenantId, req.query);
+    res.json({ success: true, data: invoices });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to fetch invoices', data: null });
+    console.error('❌ Get Invoices Error:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 };
 
 export const getInvoiceById = async (req, res) => {
   try {
-    const invoice = await getInvoiceByIdService(req.user.tenantId, req.params.id);
-    if (!invoice) return res.status(404).json({ success: false, message: 'Invoice not found', data: null });
-    res.json({ success: true, message: 'Invoice fetched successfully', data: invoice });
+    const invoice = await getInvoiceByIdService(req.tenantId, req.params.id);
+    if (!invoice) return res.status(404).json({ success: false, error: 'Invoice not found' });
+    res.json({ success: true, data: invoice });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to fetch invoice', data: null });
+    console.error('❌ Get Invoice Error:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 };
 
 export const updateInvoice = async (req, res) => {
   try {
-    const invoice = await updateInvoiceService(req.user.tenantId, req.params.id, req.body);
-    res.json({ success: true, message: 'Invoice updated successfully', data: invoice });
+    const invoice = await updateInvoiceService(req.tenantId, req.params.id, req.body);
+    
+    await logAudit({
+      tenantId: req.tenantId,
+      userId: req.userId,
+      action: 'UPDATE_INVOICE',
+      model: 'Invoice',
+      modelId: req.params.id,
+      details: req.body,
+    });
+
+    res.json({ success: true, data: invoice });
   } catch (error) {
-    res.status(400).json({ success: false, message: error.message || 'Failed to update invoice', data: null });
+    console.error('❌ Update Invoice Error:', error);
+    res.status(400).json({ success: false, error: error.message });
   }
 };
 
 export const deleteInvoice = async (req, res) => {
   try {
-    const invoice = await deleteInvoiceService(req.user.tenantId, req.params.id);
-    res.json({ success: true, message: 'Invoice cancelled successfully', data: invoice });
+    const invoice = await deleteInvoiceService(req.tenantId, req.params.id);
+    
+    await logAudit({
+      tenantId: req.tenantId,
+      userId: req.userId,
+      action: 'DELETE_INVOICE',
+      model: 'Invoice',
+      modelId: req.params.id,
+    });
+
+    res.json({ success: true, data: invoice });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to delete invoice', data: null });
+    console.error('❌ Delete Invoice Error:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 };
 

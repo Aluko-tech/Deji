@@ -31,6 +31,11 @@ model Tenant {
   notificationPreferences NotificationPreference[]
   notificationLogs        NotificationLog[]
   customFields            CustomField[] // one-to-many relation to CustomField
+  
+  // 📊 Profitability Analytics Relations
+  productCosts            ProductCost[]
+  expenses                Expense[]
+  profitabilityMetrics    ProfitabilityMetric[]
 }
 
 model User {
@@ -94,6 +99,10 @@ model Product {
   lineItems      LineItem[] // ✅ Invoice/Order associations
   lowStockAlerts LowStockAlert[] // ✅ For low stock notifications
   stockAuditLogs StockAuditLog[] // ✅ For tracking stock changes
+  
+  // 📊 Profitability Relations
+  productCost    ProductCost?
+  profitabilityMetrics ProfitabilityMetric[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
@@ -392,6 +401,111 @@ model CurrencyRate {
   fetchedAt DateTime @default(now())
 
   @@unique([base, target])
+}
+
+// ==========================
+// 📊 PROFITABILITY ANALYTICS MODELS
+// ==========================
+
+model ProductCost {
+  id                  String   @id @default(cuid())
+  tenantId            String
+  productId           String   @unique
+  costPrice           Float    // Cost price per unit
+  currency            String   @default("NGN")
+  lastUpdatedAt       DateTime @default(now()) @updatedAt
+  notes               String?  // e.g., supplier name, batch info
+  
+  product             Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tenant              Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Back-relation for profitability metrics (one product cost -> many metrics)
+  profitabilityMetrics ProfitabilityMetric[]
+
+  @@unique([tenantId, productId])
+  @@index([tenantId])
+}
+
+model Expense {
+  id                String         @id @default(cuid())
+  tenantId          String
+  category          ExpenseCategory
+  amount            Float
+  currency          String         @default("NGN")
+  description       String
+  invoiceDate       DateTime       // When the expense occurred
+  paymentDate       DateTime?      // When it was paid
+  vendor            String?        // Who it was paid to
+  receipt           String?        // File path or URL
+  paymentMethod     String?        // Cash, Bank Transfer, Card, etc.
+  notes             String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  tenant            Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([invoiceDate])
+  @@index([category])
+}
+
+enum ExpenseCategory {
+  SALARIES          // Employee wages
+  RENT              // Office rent
+  UTILITIES         // Electricity, water, internet
+  MARKETING         // Advertising, promotions
+  TRANSPORT         // Fuel, shipping
+  SUPPLIES          // Office supplies, packaging
+  MAINTENANCE       // Equipment maintenance
+  INSURANCE         // Business insurance
+  PROFESSIONAL_FEES // Legal, accounting
+  SUBSCRIPTIONS     // Software, tools
+  DEPRECIATION      // Asset depreciation
+  OTHER             // Miscellaneous
+}
+
+model ProfitabilityMetric {
+  id                      String   @id @default(cuid())
+  tenantId                String
+  productId               String
+  productCostId           String
+  period                  String   // e.g., "2026-02", "2026-Q1"
+  periodType              PeriodType @default(MONTHLY)
+  
+  // Revenue
+  totalRevenue            Float    @default(0) // Sum of all sales
+  unitsSold               Int      @default(0) // Total units sold
+  
+  // Costs
+  costOfGoodsSold         Float    @default(0) // (units * cost price)
+  directExpenses          Float    @default(0) // Product-specific expenses
+  
+  // Profitability
+  grossProfit             Float    @default(0) // Revenue - COGS
+  grossProfitMargin       Float    @default(0) // (Gross Profit / Revenue) * 100 %
+  netProfit               Float    @default(0) // Gross Profit - Direct Expenses
+  netProfitMargin         Float    @default(0) // (Net Profit / Revenue) * 100 %
+  
+  // For reference
+  currency                String   @default("NGN")
+  lastCalculatedAt        DateTime @default(now()) @updatedAt
+  
+  productCost             ProductCost @relation(fields: [productCostId], references: [id], onDelete: Cascade)
+  product                 Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tenant                  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, productId, period, periodType])
+  @@index([tenantId])
+  @@index([period])
+  @@index([productId])
+}
+
+enum PeriodType {
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
 }
 
 // ==========================

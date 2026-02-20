@@ -1,8 +1,15 @@
 import {
   addLedgerEntry,
-  getLedgerEntries,
+  getLedgerEntries as getLedgerEntriesService,
   getLedgerSummary,
 } from '../services/ledger.service.js';
+import {
+  getLedgerEntries as getEnhancedLedgerEntries,
+  getTrialBalance as getTrialBalanceService,
+  getIncomeStatement,
+  getBalanceSheet,
+  getFinancialRatios,
+} from '../services/ledger.enhanced.service.js';
 
 const VALID_TYPES = ['INCOME', 'EXPENSE'];
 
@@ -65,7 +72,7 @@ export async function listLedgerEntries(req, res) {
   filters.endDate = endDate ? new Date(endDate) : undefined;
 
   try {
-    const entries = await getLedgerEntries(filters);
+    const entries = await getLedgerEntriesService(filters);
     return res.status(200).json(entries);
   } catch (error) {
     console.error('List Ledger Entries Error:', error);
@@ -87,6 +94,132 @@ export async function getLedgerStats(req, res) {
     return res.status(500).json({
       error: 'Failed to compute ledger statistics.',
       message: error.message,
+    });
+  }
+}
+
+/**
+ * Get paginated ledger entries with advanced filtering
+ */
+export async function getLedgerEntries(req, res) {
+  const tenantId = req.tenantId;
+  const { page, limit, accountId, type, startDate, endDate } = req.query;
+
+  try {
+    const result = await getEnhancedLedgerEntries(tenantId, {
+      page: Number(page) || 1,
+      limit: Number(limit) || 50,
+      accountId,
+      type,
+      startDate,
+      endDate,
+    });
+    return res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error('Get Ledger Entries Error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch ledger entries',
+      error: error.message,
+    });
+  }
+}
+
+/**
+ * Get trial balance with debit/credit totals
+ */
+export async function getTrialBalance(req, res) {
+  const tenantId = req.tenantId;
+
+  try {
+    const result = await getTrialBalanceService(tenantId);
+    return res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error('Get Trial Balance Error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to compute trial balance',
+      error: error.message,
+    });
+  }
+}
+
+/**
+ * Get income statement for a date range
+ */
+export async function getIncomeStatementReport(req, res) {
+  const tenantId = req.tenantId;
+  const { startDate, endDate } = req.query;
+
+  if (!startDate || !endDate) {
+    return res.status(400).json({
+      success: false,
+      message: 'startDate and endDate are required',
+    });
+  }
+
+  try {
+    const result = await getIncomeStatement(tenantId, startDate, endDate);
+    return res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error('Get Income Statement Error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to compute income statement',
+      error: error.message,
+    });
+  }
+}
+
+/**
+ * Get balance sheet
+ */
+export async function getBalanceSheetReport(req, res) {
+  const tenantId = req.tenantId;
+
+  try {
+    const result = await getBalanceSheet(tenantId);
+    return res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error('Get Balance Sheet Error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to compute balance sheet',
+      error: error.message,
+    });
+  }
+}
+
+/**
+ * Get financial ratios
+ */
+export async function getFinancialRatiosReport(req, res) {
+  const tenantId = req.tenantId;
+
+  try {
+    const result = await getFinancialRatios(tenantId);
+    return res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error('Get Financial Ratios Error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to compute financial ratios',
+      error: error.message,
     });
   }
 }

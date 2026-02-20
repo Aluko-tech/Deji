@@ -1,5 +1,6 @@
-import prisma from '../db.js';
+import prisma from '../config/prisma.js';
 import { exportToCSV, exportToExcel } from '../utils/exporter.js';
+console.log("✅ Prisma client initialized in reports.service.js");
 
 /**
  * Revenue Report
@@ -210,34 +211,119 @@ function exportIfNeeded(data, exportType) {
  * Shows quick stats (for dashboard cards)
  */
 export async function getOverviewReport(tenantId) {
-  const [invoices, payments, contacts, expenses] = await Promise.all([
-    prisma.invoice.aggregate({
-      where: { tenantId },
-      _sum: { amount: true },
-    }),
-    prisma.payment.aggregate({
-      where: { tenantId },
-      _sum: { amount: true },
-    }),
-    prisma.contact.count({ where: { tenantId } }),
-    prisma.ledger.aggregate({
-      where: { tenantId, type: "EXPENSE" },
-      _sum: { amount: true },
-    }),
-  ]);
+  try {
+    // Verify prisma is initialized
+    if (!prisma || !prisma.invoice) {
+      throw new Error("Prisma client not initialized properly");
+    }
 
-  const totalRevenue = invoices._sum.amount || 0;
-  const totalPayments = payments._sum.amount || 0;
-  const totalExpenses = expenses._sum.amount || 0;
-  const totalCustomers = contacts;
+    const [invoices, payments, contactsCount, expenses, lowStockProducts, auditLogs] = await Promise.all([
+      prisma.invoice.aggregate({
+        where: { tenantId },
+        _sum: { total: true },
+      }),
+      prisma.payment.aggregate({
+        where: { tenantId },
+        _sum: { amount: true },
+      }),
+      prisma.contact.count({ where: { tenantId } }),
+      prisma.ledger.aggregate({
+        where: { tenantId, type: "EXPENSE" },
+        _sum: { amount: true },
+      }),
+      prisma.product.findMany({
+        where: { 
+          tenantId,
+          stock: { lte: 10 } // Low stock threshold
+        },
+        select: { id: true, name: true, stock: true, minStock: true },
+        take: 5,
+      }),
+      prisma.auditLog.findMany({
+        where: { tenantId },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+        select: { 
+          id: true, 
+          action: true, 
+          details: true, 
+          createdAt: true,
+          user: { select: { email: true } }
+        },
+      }),
+    ]);
 
-  return {
-    totalRevenue,
-    totalPayments,
-    totalExpenses,
-    totalCustomers,
-    netIncome: totalRevenue - totalExpenses,
-  };
+    // Get last 30 days revenue data
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const revenueLast30Days = await prisma.invoice.groupBy({
+      by: ['issueDate'],
+      where: {
+        tenantId,
+        issueDate: { gte: thirtyDaysAgo },
+      },
+      _sum: { total: true },
+    });
+
+    const totalRevenue = invoices._sum?.total || 0;
+    const totalPayments = payments._sum?.amount || 0;
+    const totalExpenses = expenses._sum?.amount || 0;
+    const totalCustomers = contactsCount;
+    const totalInvoices = await prisma.invoice.count({ where: { tenantId } });
+
+    return {
+      summary: {
+        totalRevenue,
+        totalPayments,
+        totalExpenses,
+        totalContacts: totalCustomers,
+        totalInvoices,
+        netIncome: totalRevenue - totalExpenses,
+      },
+      widgets: {
+        lowStockProducts: lowStockProducts.map(p => ({
+          id: p.id,
+          name: p.name,
+          stock: p.stock,
+          minStock: p.minStock,
+        })),
+      },
+      charts: {
+        revenueLast30Days: revenueLast30Days.map(item => ({
+          date: new Date(item.issueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          total: item._sum.total || 0,
+        })),
+      },
+      activities: auditLogs.map(log => ({
+        id: log.id,
+        action: log.action,
+        details: log.details,
+        timestamp: log.createdAt,
+        user: log.user?.email || 'System',
+      })),
+    };
+  } catch (error) {
+    console.error("❌ getOverviewReport error:", error);
+    // Return safe defaults to prevent dashboard crash
+    return {
+      summary: {
+        totalRevenue: 0,
+        totalPayments: 0,
+        totalExpenses: 0,
+        totalContacts: 0,
+        totalInvoices: 0,
+        netIncome: 0,
+      },
+      widgets: {
+        lowStockProducts: [],
+      },
+      charts: {
+        revenueLast30Days: [],
+      },
+      activities: [],
+    };
+  }
 }
 
 /**

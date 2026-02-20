@@ -1,4 +1,4 @@
-import prisma from '../utils/prisma.js';
+import prisma from '../config/prisma.js';
 import { stringify } from 'csv-stringify/sync';
 import { parse } from 'csv-parse/sync';
 
@@ -38,16 +38,32 @@ export async function getProductByIdService(tenantId, id) {
 
 // ✅ Update Product
 export async function updateProductService(tenantId, id, data) {
-  return await prisma.product.updateMany({
+  const product = await prisma.product.findFirst({
     where: { id, tenantId },
+  });
+  
+  if (!product) {
+    throw new Error('Product not found');
+  }
+  
+  return await prisma.product.update({
+    where: { id },
     data,
   });
 }
 
 // ✅ Delete Product
 export async function deleteProductService(tenantId, id) {
-  return await prisma.product.deleteMany({
+  const product = await prisma.product.findFirst({
     where: { id, tenantId },
+  });
+  
+  if (!product) {
+    throw new Error('Product not found');
+  }
+  
+  return await prisma.product.delete({
+    where: { id },
   });
 }
 

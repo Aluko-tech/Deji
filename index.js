@@ -28,7 +28,11 @@ const allowedOrigins = [
 // ✅ CORS middleware
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
+  // Check if origin is in allowed list or is a GitHub Codespaces URL
+  const isAllowed = allowedOrigins.includes(origin) || 
+    (origin && origin.includes(".app.github.dev"));
+  
+  if (isAllowed) {
     res.setHeader("Access-Control-Allow-Origin", origin);
   }
   res.setHeader(

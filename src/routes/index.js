@@ -21,6 +21,7 @@ import subscriptionRoutes from "./subscription.routes.js";
 import stripeRoutes from "./stripe.routes.js";
 import chatbotRoutes from "./chatbot.routes.js";
 import chatbotTestRoutes from "./chatbotTest.routes.js";
+import reportsRoutes from "./reports.routes.js";
 import healthRoutes from "./health.js";
 import uploadRoutes from "./upload.routes.js";
 
@@ -54,5 +55,6 @@ router.use("/localization", authenticate, localeMiddleware, localizationRoutes);
 router.use("/subscription", authenticate, subscriptionRoutes);
 router.use("/chatbot", authenticate, chatbotRoutes);
 router.use("/chatbot-test", authenticate, chatbotTestRoutes);
+router.use("/reports", authenticate, reportsRoutes);
 
 export default router;

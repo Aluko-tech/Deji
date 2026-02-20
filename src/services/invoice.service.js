@@ -173,23 +173,31 @@ export async function getInvoiceByIdService(tenantId, id) {
 }
 
 export async function updateInvoiceService(tenantId, id, data) {
-  const updated = await prisma.invoice.updateMany({
+  const invoice = await prisma.invoice.findFirst({
     where: { id, tenantId },
+  });
+  
+  if (!invoice) throw new Error('Invoice not found.');
+
+  const updated = await prisma.invoice.update({
+    where: { id },
     data,
   });
-
-  if (updated.count !== 1) throw new Error('Invoice not found.');
 
   return getInvoiceByIdService(tenantId, id);
 }
 
 export async function deleteInvoiceService(tenantId, id) {
-  const updated = await prisma.invoice.updateMany({
+  const invoice = await prisma.invoice.findFirst({
     where: { id, tenantId },
+  });
+  
+  if (!invoice) throw new Error('Invoice not found.');
+
+  const updated = await prisma.invoice.update({
+    where: { id },
     data: { status: 'CANCELLED' },
   });
-
-  if (updated.count !== 1) throw new Error('Invoice not found.');
 
   return getInvoiceByIdService(tenantId, id);
 }

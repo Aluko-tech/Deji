@@ -3,6 +3,8 @@ import {
   createLedgerEntry,
   listLedgerEntries,
   getLedgerStats,
+  getLedgerEntries,
+  getTrialBalance,
 } from '../controllers/ledger.controller.js';
 import { authenticate } from '../middleware/auth.js';
 
@@ -24,6 +26,20 @@ router.post('/', createLedgerEntry);
  * @access  Private
  */
 router.get('/', listLedgerEntries);
+
+/**
+ * @route   GET /api/ledger/entries
+ * @desc    Get paginated ledger entries with advanced filtering
+ * @access  Private
+ */
+router.get('/entries', getLedgerEntries);
+
+/**
+ * @route   GET /api/ledger/trial-balance
+ * @desc    Get trial balance with debit/credit totals
+ * @access  Private
+ */
+router.get('/trial-balance', getTrialBalance);
 
 /**
  * @route   GET /api/ledger/summary

@@ -1,6 +1,6 @@
 // src/controllers/report.controller.js
 import { PrismaClient } from "@prisma/client";
-import { logAction } from "../utils/auditLog.js";
+import { logAudit } from "../services/auditLog.service.js";
 import * as reportService from "../services/reports.service.js";
 import { generateInsights } from "../services/insight.service.js"; // 🧠 NEW for AI insights
 
@@ -20,7 +20,7 @@ export const createReport = async (req, res) => {
       data: { title, content, type, relatedId, tenantId, createdById: userId },
     });
 
-    await logAction({
+    await logAudit({
       tenantId,
       userId,
       action: "CREATE_REPORT",
@@ -82,7 +82,7 @@ export const updateReport = async (req, res) => {
       data: updates,
     });
 
-    await logAction({
+    await logAudit({
       tenantId,
       userId,
       action: "UPDATE_REPORT",
@@ -112,7 +112,7 @@ export const deleteReport = async (req, res) => {
 
     await prisma.report.delete({ where: { id } });
 
-    await logAction({
+    await logAudit({
       tenantId,
       userId,
       action: "DELETE_REPORT",
@@ -136,7 +136,7 @@ export async function getRevenueReport(req, res) {
 
     const data = await reportService.getRevenueReport(tenantId, { period, startDate, endDate, exportType });
 
-    await logAction({
+    await logAudit({
       tenantId,
       userId,
       action: "VIEW_REVENUE_REPORT",
@@ -160,7 +160,7 @@ export async function getExpensesReport(req, res) {
 
     const data = await reportService.getExpensesReport(tenantId, { category, startDate, endDate, exportType });
 
-    await logAction({
+    await logAudit({
       tenantId,
       userId,
       action: "VIEW_EXPENSES_REPORT",
@@ -184,7 +184,7 @@ export async function getProfitLossReport(req, res) {
 
     const data = await reportService.getProfitLossReport(tenantId, { startDate, endDate, exportType });
 
-    await logAction({
+    await logAudit({
       tenantId,
       userId,
       action: "VIEW_PROFIT_LOSS_REPORT",
@@ -208,7 +208,7 @@ export async function getSalesByProductReport(req, res) {
 
     const data = await reportService.getSalesByProductReport(tenantId, { startDate, endDate, top, exportType });
 
-    await logAction({
+    await logAudit({
       tenantId,
       userId,
       action: "VIEW_SALES_BY_PRODUCT_REPORT",
@@ -232,7 +232,7 @@ export async function getCustomerGrowthReport(req, res) {
 
     const data = await reportService.getCustomerGrowthReport(tenantId, { period, startDate, endDate, exportType });
 
-    await logAction({
+    await logAudit({
       tenantId,
       userId,
       action: "VIEW_CUSTOMER_GROWTH_REPORT",
@@ -256,7 +256,7 @@ export async function getOutstandingInvoicesReport(req, res) {
 
     const data = await reportService.getOutstandingInvoicesReport(tenantId, { exportType });
 
-    await logAction({
+    await logAudit({
       tenantId,
       userId,
       action: "VIEW_OUTSTANDING_INVOICES_REPORT",
@@ -280,7 +280,7 @@ export async function getCashFlowReport(req, res) {
 
     const data = await reportService.getCashFlowReport(tenantId, { startDate, endDate, exportType });
 
-    await logAction({
+    await logAudit({
       tenantId,
       userId,
       action: "VIEW_CASH_FLOW_REPORT",
@@ -303,7 +303,7 @@ export const getOverviewReport = async (req, res) => {
   try {
     const overview = await reportService.getOverviewReport(tenantId);
 
-    await logAction({
+    await logAudit({
       tenantId,
       userId,
       action: "VIEW_OVERVIEW_REPORT",
@@ -326,7 +326,7 @@ export const getSegmentsReport = async (req, res) => {
   try {
     const segments = await reportService.getSegmentsReport(tenantId);
 
-    await logAction({
+    await logAudit({
       tenantId,
       userId,
       action: "VIEW_SEGMENTS_REPORT",
@@ -350,7 +350,7 @@ export const getLedgerReport = async (req, res) => {
   try {
     const ledgerSummary = await reportService.getLedgerReport(tenantId, { startDate, endDate });
 
-    await logAction({
+    await logAudit({
       tenantId,
       userId,
       action: "VIEW_LEDGER_REPORT",
@@ -389,7 +389,7 @@ export const getInsightsReport = async (req, res) => {
 
     const insight = generateInsights(data);
 
-    await logAction({
+    await logAudit({
       tenantId,
       userId,
       action: "VIEW_INSIGHTS_REPORT",
