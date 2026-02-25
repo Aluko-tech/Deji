@@ -238,4 +238,44 @@ export async function getLedgerReport(params = {}) {
   return api.get("/reports/ledger", { params });
 }
 
+// ===== Forms helpers =====
+export async function getForms(params = {}) {
+  return api.get("/forms", { params });
+}
+
+export async function getFormById(id) {
+  return api.get(`/forms/${id}`);
+}
+
+export async function createForm(data) {
+  return api.post("/forms", data);
+}
+
+export async function updateForm(id, data) {
+  return api.put(`/forms/${id}`, data);
+}
+
+export async function deleteForm(id) {
+  return api.delete(`/forms/${id}`);
+}
+
+export async function publishForm(id, isPublished) {
+  return api.post(`/forms/${id}/publish`, { isPublished });
+}
+
+export async function getFormSubmissions(formId, params = {}) {
+  return api.get(`/forms/${formId}/submissions`, { params });
+}
+
+export async function markSubmissionAsRead(submissionId) {
+  return api.patch(`/forms/submissions/${submissionId}/read`);
+}
+
+export async function getFormAnalytics(formId) {
+  return api.get(`/forms/${formId}/analytics`);
+}
+
+export async function submitForm(tenantId, formId, formData) {
+  return api.post(`/forms/${tenantId}/${formId}/submit`, formData);
+}
 export default api;

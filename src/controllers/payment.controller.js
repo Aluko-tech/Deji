@@ -31,7 +31,8 @@ export const getPayments = async (req, res) => {
     const payments = await getPaymentsService(req.tenantId, req.query);
     res.json({ success: true, message: 'Payments fetched successfully', data: payments });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to fetch payments', data: null });
+    console.error('Error fetching payments:', error.message, error.stack);
+    res.status(500).json({ success: false, message: error.message || 'Failed to fetch payments', data: null });
   }
 };
 

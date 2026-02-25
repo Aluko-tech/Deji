@@ -60,7 +60,7 @@ export default defineConfig({
   },
 
   server: {
-    host: true,
+    host: '0.0.0.0',
     port: 5173,
     // Proxy API requests to local backend
     proxy: {
@@ -70,8 +70,8 @@ export default defineConfig({
         secure: false,
       },
     },
-    // HMR disabled for Codespaces - let the browser handle it
-    hmr: false,
+    // Disable HMR on remote server, let browser decide
+    hmr: process.env.CODESPACE_NAME ? false : true,
   },
 
   build: {

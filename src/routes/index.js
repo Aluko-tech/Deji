@@ -22,8 +22,10 @@ import stripeRoutes from "./stripe.routes.js";
 import chatbotRoutes from "./chatbot.routes.js";
 import chatbotTestRoutes from "./chatbotTest.routes.js";
 import reportsRoutes from "./reports.routes.js";
+import analyticsRoutes from "./analytics.routes.js";
 import healthRoutes from "./health.js";
 import uploadRoutes from "./upload.routes.js";
+import formRoutes from "./form.routes.js";
 
 import { authenticate } from "../middleware/auth.js";
 import { localeMiddleware } from "../middleware/locale.middleware.js";
@@ -38,6 +40,7 @@ router.use("/whatsapp", webhookRoutes);
 router.use("/stripe", stripeRoutes);
 router.use("/health", healthRoutes);
 router.use("/uploads", uploadRoutes);
+router.use("/forms", formRoutes); // Includes both public and protected routes
 
 // ✅ Protected / authenticated
 router.use("/contacts", authenticate, contactRoutes);
@@ -56,5 +59,6 @@ router.use("/subscription", authenticate, subscriptionRoutes);
 router.use("/chatbot", authenticate, chatbotRoutes);
 router.use("/chatbot-test", authenticate, chatbotTestRoutes);
 router.use("/reports", authenticate, reportsRoutes);
+router.use("/analytics", authenticate, analyticsRoutes);
 
 export default router;
