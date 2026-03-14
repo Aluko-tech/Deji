@@ -11,12 +11,13 @@ import {
   getFormAnalytics,
   publishForm,
 } from '../controllers/form.controller.js';
+import { enforceLimit } from '../middleware/planLimit.middleware.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
 
 // ✅ Protected routes (requires authentication)
-router.post('/', authenticate, authorize(['admin', 'staff']), createForm);
+router.post('/', authenticate, authorize(['admin', 'staff']), enforceLimit('formsMax'), createForm);
 router.get('/', authenticate, getForms);
 router.get('/:id', authenticate, getFormById);
 router.put('/:id', authenticate, authorize(['admin', 'staff']), updateForm);

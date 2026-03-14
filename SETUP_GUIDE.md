@@ -10,7 +10,7 @@
 
 1. **Install dependencies** (if not already done):
    ```bash
-   cd /workspaces/Deji/deji-frontend
+   cd /workspaces/Deji/deji-nextjs/deji-platform
    npm install
    ```
 
@@ -19,6 +19,8 @@
    npm run dev
    ```
    - Frontend will be on: http://localhost:5173
+
+   For EMAIL_PASS — don't use your normal Gmail password. Go to Google Account → Security → 2-Step Verification → App passwords, create one for "Mail", and paste that 16-character code there.
 
 ## 🗄️ Database Setup (Required)
 

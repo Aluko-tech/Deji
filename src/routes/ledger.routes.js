@@ -3,49 +3,35 @@ import {
   createLedgerEntry,
   listLedgerEntries,
   getLedgerStats,
-  getLedgerEntries,
   getTrialBalance,
 } from '../controllers/ledger.controller.js';
 import { authenticate } from '../middleware/auth.js';
+import { deleteLedgerEntry } from '../services/ledger.service.js';
 
 const router = express.Router();
-
-// 🔐 Require authentication for all ledger routes
 router.use(authenticate);
 
-/**
- * @route   POST /api/ledger
- * @desc    Create a new ledger entry (INCOME or EXPENSE)
- * @access  Private
- */
-router.post('/', createLedgerEntry);
-
-/**
- * @route   GET /api/ledger
- * @desc    List ledger entries (optional filters: type, startDate, endDate)
- * @access  Private
- */
+// GET /api/ledger — list entries (used by ledger page)
 router.get('/', listLedgerEntries);
 
-/**
- * @route   GET /api/ledger/entries
- * @desc    Get paginated ledger entries with advanced filtering
- * @access  Private
- */
-router.get('/entries', getLedgerEntries);
+// POST /api/ledger — create expense/income entry
+router.post('/', createLedgerEntry);
 
-/**
- * @route   GET /api/ledger/trial-balance
- * @desc    Get trial balance with debit/credit totals
- * @access  Private
- */
-router.get('/trial-balance', getTrialBalance);
+// DELETE /api/ledger/:id
+router.delete('/:id', async (req, res) => {
+  try {
+    const result = await deleteLedgerEntry({ id: req.params.id, tenantId: req.user.tenantId });
+    if (!result) return res.status(404).json({ message: 'Entry not found' });
+    res.json({ message: 'Deleted' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 
-/**
- * @route   GET /api/ledger/summary
- * @desc    Get ledger statistics (total income, total expense, balance)
- * @access  Private
- */
+// GET /api/ledger/summary
 router.get('/summary', getLedgerStats);
+
+// GET /api/ledger/trial-balance
+router.get('/trial-balance', getTrialBalance);
 
 export default router;

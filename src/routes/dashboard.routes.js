@@ -1,19 +1,11 @@
-// src/routes/dashboard.routes.js
+import { Router } from "express";
+import { getDashboardData, getDashboardStats, getLowStockProducts } from "../controllers/dashboard.controller.js";
+import { authenticate } from "../middleware/auth.js";
 
-import express from 'express';
-import { authenticate } from '../middleware/auth.js';
-import { 
-  getDashboardStats, 
-  getLowStockProducts, 
-  getDashboardData 
-} from '../controllers/dashboard.controller.js'; 
+const router = Router();
 
-const router = express.Router();
-
-// ✅ Routes handled by controllers only 
- 
-router.get('/low-stock', authenticate, getLowStockProducts); 
-router.get('/', authenticate, getDashboardData); 
-router.get('/stats', authenticate, getDashboardStats); 
+router.get("/low-stock", authenticate, getLowStockProducts);
+router.get("/stats", authenticate, getDashboardStats);
+router.get("/", authenticate, getDashboardData);
 
 export default router;

@@ -1,47 +1,54 @@
-// src/middleware/planLimit.middleware.js
-import { getSubscription, PLAN_LIMITS, getUsage } from '../services/subscription.service.js';
+import { getEffectiveLimits, getUsage } from '../services/subscription.service.js';
 
-/**
- * Use to block requests that exceed plan limits.
- * Example: enforceLimit('invoicesPerMonth', req => usage.invoicesThisMonth)
- */
+// Map feature keys to usage counters
+const FEATURE_COUNTER_MAP = {
+  invoicesPerMonth:  'invoicesThisMonth',
+  contactsMax:       'contactsTotal',
+  leadsMax:          'leadsTotal',
+  productsMax:       'productsTotal',
+  usersMax:          'usersTotal',
+  warehousesMax:     'warehousesTotal',
+  formsMax:          'formsTotal',
+};
+
 export function enforceLimit(feature) {
   return async (req, res, next) => {
     try {
       const tenantId = req.user?.tenantId;
       if (!tenantId) return res.status(401).json({ error: 'Unauthorized' });
 
-      const sub = await getSubscription(tenantId);
-      const limits = PLAN_LIMITS[sub.plan];
+      const limits = await getEffectiveLimits(tenantId);
       if (!limits) return res.status(500).json({ error: 'Plan limits not configured' });
 
-      // boolean features (e.g., whatsappEnabled, reportsAdvanced)
-      if (typeof limits[feature] === 'boolean') {
-        if (!limits[feature]) {
-          return res.status(403).json({ error: `Feature not available on ${sub.plan} plan` });
+      const limit = limits[feature];
+
+      // Boolean feature gate
+      if (typeof limit === 'boolean') {
+        if (!limit) {
+          return res.status(403).json({
+            error:   `Feature not available on ${sub.plan} plan`,
+            feature,
+            upgrade: true,
+          });
         }
         return next();
       }
 
-      // numeric limits
-      const usage = await getUsage(tenantId);
+      // Numeric limit — check current usage
+      const counterKey = FEATURE_COUNTER_MAP[feature];
+      if (!counterKey) return next(); // unknown feature, allow
 
-      // map known counters
-      const counters = {
-        invoicesPerMonth: usage.invoicesThisMonth,
-        contactsMax: usage.contactsTotal,
-        usersMax: usage.usersTotal,
-      };
+      const usage   = await getUsage(tenantId);
+      const current = usage[counterKey];
+      const max     = limit;
 
-      const current = counters[feature];
-      const max = limits[feature];
-
-      if (typeof current === 'number' && typeof max === 'number') {
-        // if this request will CREATE a new resource, we proactively block when current >= max
+      if (typeof current === 'number' && typeof max === 'number' && max < 999999) {
         if (current >= max) {
           return res.status(403).json({
-            error: `Limit exceeded for ${feature}`,
-            detail: `Plan ${sub.plan} allows ${max}. Current usage: ${current}.`,
+            error:   `Limit reached for ${feature}`,
+            detail:  `Your ${sub.plan} plan allows ${max}. Current: ${current}.`,
+            upgrade: true,
+            plan:    sub.plan,
           });
         }
       }

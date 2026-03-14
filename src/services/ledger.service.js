@@ -1,22 +1,37 @@
 import prisma from '../config/prisma.js';
 
-export async function addLedgerEntry({ tenantId, type, amount, description, relatedInvoiceId = null }) {
-  return await prisma.ledger.create({
+export async function addLedgerEntry({ tenantId, type, amount, description, relatedInvoiceId = null, reference = null, category = null, date = null }) {
+  // Find or create a default account for this tenant
+  let account = await prisma.account.findFirst({
+    where: { tenantId, type: type === 'INCOME' ? 'REVENUE' : 'EXPENSE' },
+  });
+  if (!account) {
+    account = await prisma.account.create({
+      data: {
+        tenantId,
+        name: type === 'INCOME' ? 'General Revenue' : 'General Expense',
+        type: type === 'INCOME' ? 'REVENUE' : 'EXPENSE',
+      },
+    });
+  }
+
+  return await prisma.ledgerEntry.create({
     data: {
       tenantId,
-      type,
-      amount,
+      type:        type?.toUpperCase(),
+      amount:      parseFloat(amount),
       description,
-      relatedInvoiceId,
+      accountId:   account.id,
+      reference:   reference || relatedInvoiceId || null,
     },
   });
 }
 
-export async function getLedgerEntries({ tenantId, type, startDate, endDate }) {
-  return await prisma.ledger.findMany({
+export async function getLedgerEntries({ tenantId, type, startDate, endDate, limit = 500 }) {
+  return await prisma.ledgerEntry.findMany({
     where: {
       tenantId,
-      ...(type && { type }),
+      ...(type && { type: type.toUpperCase() }),
       ...(startDate && endDate && {
         createdAt: {
           gte: new Date(startDate),
@@ -24,26 +39,38 @@ export async function getLedgerEntries({ tenantId, type, startDate, endDate }) {
         },
       }),
     },
-    orderBy: {
-      createdAt: 'desc',
-    },
+    include: { account: true },
+    orderBy: { createdAt: 'desc' },
+    take: Number(limit) || 500,
   });
 }
 
+export async function deleteLedgerEntry({ id, tenantId }) {
+  const entry = await prisma.ledgerEntry.findFirst({ where: { id, tenantId } });
+  if (!entry) return null;
+  return await prisma.ledgerEntry.delete({ where: { id } });
+}
+
 export async function getLedgerSummary(tenantId) {
-  const credit = await prisma.ledger.aggregate({
-    where: { tenantId, type: 'credit' },
-    _sum: { amount: true },
-  });
+  const [incomeAgg, expenseAgg] = await Promise.all([
+    prisma.ledgerEntry.aggregate({
+      where: { tenantId, type: 'INCOME' },
+      _sum: { amount: true },
+    }),
+    prisma.ledgerEntry.aggregate({
+      where: { tenantId, type: 'EXPENSE' },
+      _sum: { amount: true },
+    }),
+  ]);
 
-  const debit = await prisma.ledger.aggregate({
-    where: { tenantId, type: 'debit' },
-    _sum: { amount: true },
-  });
-
+  const totalIncome  = Number(incomeAgg._sum.amount  || 0);
+  const totalExpense = Number(expenseAgg._sum.amount || 0);
   return {
-    totalCredit: credit._sum.amount || 0,
-    totalDebit: debit._sum.amount || 0,
-    balance: (credit._sum.amount || 0) - (debit._sum.amount || 0),
+    totalIncome,
+    totalExpense,
+    balance: totalIncome - totalExpense,
+    // legacy field names (backwards compat)
+    totalCredit: totalIncome,
+    totalDebit:  totalExpense,
   };
 }

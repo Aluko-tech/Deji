@@ -30,6 +30,6 @@ router.get("/balance-sheet", getBalanceSheetReport);
 router.get("/financial-ratios", getFinancialRatiosReport);
 
 // 🧠 Intelligent Insights (AI-driven)
-router.get("/insights", enforceLimit("reportsAdvanced"), getInsightsReport);
+router.get("/insights", enforceLimit("aiInsights"), getInsightsReport);
 
 export default router;
