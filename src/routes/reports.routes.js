@@ -3,16 +3,13 @@ import {
   getOverviewReport,
   getSegmentsReport,
   getLedgerReport,
-  getRevenueReport,
-  getExpensesReport,
-  getProfitLossReport,
-  getSalesByProductReport,
-  getCustomerGrowthReport,
-  getOutstandingInvoicesReport,
-  getCashFlowReport,
-  getSalesCohorts,
-  getInsightsReport, // 🧠 NEW — AI insights endpoint
+  getInsightsReport,
 } from "../controllers/report.controller.js";
+import {
+  getIncomeStatementReport,
+  getBalanceSheetReport,
+  getFinancialRatiosReport,
+} from "../controllers/ledger.controller.js";
 
 import { authenticate } from "../middleware/auth.js";
 import { enforceLimit } from "../middleware/planLimit.middleware.js";
@@ -27,19 +24,12 @@ router.get("/overview", getOverviewReport);
 router.get("/segments", getSegmentsReport);
 router.get("/ledger", getLedgerReport);
 
-// ✅ Financial Reports
-router.get("/revenue", getRevenueReport);
-router.get("/expenses", getExpensesReport);
-router.get("/profit-loss", getProfitLossReport);
-router.get("/sales-by-product", getSalesByProductReport);
-router.get("/customers-growth", getCustomerGrowthReport);
-router.get("/outstanding-invoices", getOutstandingInvoicesReport);
-router.get("/cash-flow", getCashFlowReport);
-
-// ✅ Advanced Reports (Pro/Business only)
-router.get("/advanced/sales-cohorts", enforceLimit("reportsAdvanced"), getSalesCohorts);
+// 💰 Financial Reports
+router.get("/income-statement", getIncomeStatementReport);
+router.get("/balance-sheet", getBalanceSheetReport);
+router.get("/financial-ratios", getFinancialRatiosReport);
 
 // 🧠 Intelligent Insights (AI-driven)
-router.get("/insights", enforceLimit("reportsAdvanced"), getInsightsReport);
+router.get("/insights", enforceLimit("aiInsights"), getInsightsReport);
 
 export default router;

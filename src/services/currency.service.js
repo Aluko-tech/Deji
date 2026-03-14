@@ -15,7 +15,7 @@ export async function fetchAndCacheRate(base, target) {
     const data = res.data;
 
     // Debug log the actual API payload
-    console.log(`📡 ${base} → ${target} raw response:`, data);
+    // console.log(`📡 ${base} → ${target} raw response:`, data);
 
     if (!data || !data.rates || !data.rates[target]) {
       throw new Error('Invalid currency response');

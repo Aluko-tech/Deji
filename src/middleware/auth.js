@@ -14,7 +14,6 @@ export const authenticate = async (req, res, next) => {
       return res.status(401).json({ message: "No token provided." });
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log("🧩 Decoded JWT:", decoded);
 
     // ✅ Ensure correct property names
     const userId = decoded.userId || decoded.id;
@@ -45,7 +44,9 @@ export const authenticate = async (req, res, next) => {
 
     next();
   } catch (err) {
-    console.error("❌ Auth Middleware Error:", err);
+    if (err.name !== "JsonWebTokenError") {
+      console.error("❌ Auth Middleware Error:", err);
+    }
     return res.status(401).json({
       message:
         err.name === "TokenExpiredError"

@@ -1,6 +1,4 @@
-// src/routes/index.js
 import { Router } from "express";
-
 import authRoutes from "./auth.routes.js";
 import protectedRoutes from "./protected.routes.js";
 import contactRoutes from "./contact.routes.js";
@@ -21,15 +19,22 @@ import subscriptionRoutes from "./subscription.routes.js";
 import stripeRoutes from "./stripe.routes.js";
 import chatbotRoutes from "./chatbot.routes.js";
 import chatbotTestRoutes from "./chatbotTest.routes.js";
+import reportsRoutes from "./reports.routes.js";
+import analyticsRoutes from "./analytics.routes.js";
 import healthRoutes from "./health.js";
 import uploadRoutes from "./upload.routes.js";
-
+import formRoutes from "./form.routes.js";
+import adWebhookRoutes from "./adWebhook.routes.js";
+import inventoryRoutes from "./inventory.routes.js";
+import posRoutes from "./pos.routes.js";
+import websiteRoutes from "./website.routes.js";
 import { authenticate } from "../middleware/auth.js";
 import { localeMiddleware } from "../middleware/locale.middleware.js";
+import warehouseRouter from './warehouse.routes.js';
 
 const router = Router();
 
-// ✅ Public/unprotected
+// ── Public routes ──
 router.use("/auth", authRoutes);
 router.use("/", protectedRoutes);
 router.use("/whatsapp", whatsappRoutes);
@@ -37,8 +42,10 @@ router.use("/whatsapp", webhookRoutes);
 router.use("/stripe", stripeRoutes);
 router.use("/health", healthRoutes);
 router.use("/uploads", uploadRoutes);
+router.use("/forms", formRoutes);
+router.use("/forms", formRoutes);
 
-// ✅ Protected / authenticated
+// ── Protected routes ──
 router.use("/contacts", authenticate, contactRoutes);
 router.use("/tags", authenticate, tagRoutes);
 router.use("/products", authenticate, productRoutes);
@@ -54,5 +61,12 @@ router.use("/localization", authenticate, localeMiddleware, localizationRoutes);
 router.use("/subscription", authenticate, subscriptionRoutes);
 router.use("/chatbot", authenticate, chatbotRoutes);
 router.use("/chatbot-test", authenticate, chatbotTestRoutes);
+router.use("/reports", authenticate, reportsRoutes);
+router.use("/analytics", authenticate, analyticsRoutes);
+router.use("/inventory", authenticate, inventoryRoutes);
+router.use("/pos", authenticate, posRoutes);
+router.use("/website", authenticate, websiteRoutes);
+router.use("/webhooks", adWebhookRoutes);
+router.use('/warehouses', authenticate, warehouseRouter);
 
 export default router;

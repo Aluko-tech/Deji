@@ -1,23 +1,23 @@
 import express from "express";
+import { enforceLimit } from "../middleware/planLimit.middleware.js";
+import { authenticate } from "../middleware/auth.js";
 import {
-  createProduct,
-  getProducts,
-  updateProduct,
-  deleteProduct,
-  getProductById,
-  bulkImportProducts,
-  exportProductsToCSV,
+  createProduct, getProducts, getProductById,
+  updateProduct, deleteProduct, adjustStock,
+  getInventoryStats, bulkImportProducts, exportProductsToCSV,
 } from "../controllers/product.controller.js";
-import upload from "../middleware/upload.js";
 
 const router = express.Router();
+router.use(authenticate);
 
-router.post("/", createProduct);
+router.get("/stats", getInventoryStats);
+router.get("/export", enforceLimit("bulkImport"), exportProductsToCSV);
+router.post("/import", enforceLimit("bulkImport"), bulkImportProducts);
 router.get("/", getProducts);
-router.get("/export", exportProductsToCSV); // ⬇️ CSV export
-router.post("/import", upload.single("file"), bulkImportProducts); // ⬆️ Bulk import
+router.post("/", enforceLimit("productsMax"), createProduct);
 router.get("/:id", getProductById);
 router.put("/:id", updateProduct);
 router.delete("/:id", deleteProduct);
+router.post("/:id/adjust-stock", adjustStock);
 
 export default router;

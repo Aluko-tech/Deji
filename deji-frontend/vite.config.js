@@ -9,7 +9,7 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: [
-        "favicon.ico",
+        "vite.svg",
         "icons/icon-192x192.png",
         "icons/icon-256x256.png",
         "icons/icon-512x512.png",
@@ -60,15 +60,18 @@ export default defineConfig({
   },
 
   server: {
-    host: true,
+    host: '0.0.0.0',
     port: 5173,
+    // Proxy API requests to local backend
     proxy: {
       "/api": {
-        target: "http://localhost:5000",
+        target: "http://localhost:3000",
         changeOrigin: true,
         secure: false,
       },
     },
+    // Disable HMR on remote server, let browser decide
+    hmr: process.env.CODESPACE_NAME ? false : true,
   },
 
   build: {

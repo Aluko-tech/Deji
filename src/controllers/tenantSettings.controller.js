@@ -24,23 +24,10 @@ export const updateTenantSettings = async (req, res) => {
   try {
     const tenantId = req.user.tenantId;
     const data = req.body;
-    let logoUrl = null;
-
-    // 🖼️ Handle logo upload
-    if (req.file) {
-      if (process.env.UPLOAD_PROVIDER === "cloudinary") {
-        const result = await cloudinary.uploader.upload(req.file.path, {
-          folder: "deji-api/logos",
-        });
-        logoUrl = result.secure_url;
-        fs.unlinkSync(req.file.path); // delete temp file
-      } else {
-        logoUrl = `/uploads/logos/${req.file.filename}`;
-      }
-    }
-
-    // Combine body + logo
-    const payload = { ...data, ...(logoUrl && { logoUrl }) };
+    // Accept Cloudinary URLs sent directly from frontend
+    const payload = { ...data };
+    if (payload.logoUrl === '') payload.logoUrl = null;
+    if (payload.receiptLogoUrl === '') payload.receiptLogoUrl = null;
 
     // Update in DB
     const updated = await updateSettingsService(tenantId, payload);

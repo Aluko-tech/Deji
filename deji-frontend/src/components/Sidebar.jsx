@@ -1,7 +1,7 @@
 import { NavLink } from "react-router-dom";
 import {
   Home, Users, Layers, Package, FileText, CreditCard,
-  MessageCircle, BarChart3, Settings, Menu
+  MessageCircle, BarChart3, Settings, Menu, PieChart
 } from "lucide-react";
 
 const navItems = [
@@ -13,6 +13,7 @@ const navItems = [
   { to: "/payments", label: "Payments", icon: CreditCard },
   { to: "/whatsapp", label: "WhatsApp", icon: MessageCircle },
   { to: "/ledger", label: "Ledger", icon: BarChart3 },
+  { to: "/analytics", label: "Analytics", icon: PieChart },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 

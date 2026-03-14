@@ -32,12 +32,24 @@ import LowStockAlerts from "./pages/Inventory/LowStockAlerts";
 // WhatsApp
 import Messages from "./pages/WhatsApp/Messages";
 
+// Forms & Landing Pages
+import FormList from "./pages/Forms/FormList";
+import FormBuilder from "./pages/Forms/FormBuilder";
+import FormSubmissions from "./pages/Forms/FormSubmissions";
+import FormEmbed from "./pages/Forms/FormEmbed";
+
+// Analytics
+import AnalyticsOverview from "./pages/Analytics/Overview";
+import ProductProfitability from "./pages/Analytics/ProductProfitability";
+import ProductDetails from "./pages/Analytics/ProductDetails";
+
 export default function App() {
   return (
     <Routes>
       {/* Public */}
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
+      <Route path="/forms/embed/:tenantId/:formId" element={<FormEmbed />} />
 
       {/* Protected */}
       <Route
@@ -61,17 +73,29 @@ export default function App() {
 
         <Route path="products" element={<ProductList />} />
         <Route path="products/new" element={<ProductForm />} />
+        <Route path="products/:id/edit" element={<ProductForm />} />
 
         <Route path="invoices" element={<InvoiceList />} />
         <Route path="invoices/new" element={<InvoiceForm />} />
+        <Route path="invoices/:id" element={<InvoiceForm />} />
 
         <Route path="payments" element={<PaymentList />} />
         <Route path="payments/new" element={<PaymentForm />} />
+        <Route path="payments/:id/edit" element={<PaymentForm />} />
 
         <Route path="inventory" element={<StockList />} />
         <Route path="inventory/low-stock" element={<LowStockAlerts />} />
 
         <Route path="ledger" element={<LedgerList />} />
+        
+        <Route path="forms" element={<FormList />} />
+        <Route path="forms/new" element={<FormBuilder />} />
+        <Route path="forms/:id" element={<FormBuilder />} />
+        <Route path="forms/:formId/submissions" element={<FormSubmissions />} />
+        
+        <Route path="analytics" element={<AnalyticsOverview />} />
+        <Route path="analytics/products" element={<ProductProfitability />} />
+        <Route path="analytics/products/:id" element={<ProductDetails />} />
 
         <Route path="whatsapp" element={<Messages />} />
       </Route>

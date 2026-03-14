@@ -20,6 +20,7 @@ export async function updateTenantSettings(tenantId, data) {
   const cleanedData = {
     businessName: data.businessName ?? undefined,
     logoUrl: data.logoUrl ?? undefined,
+    receiptLogoUrl: data.receiptLogoUrl ?? undefined,
     primaryColor: data.primaryColor ?? undefined,
     currency: data.currency ?? undefined,
     language: data.language ?? undefined,

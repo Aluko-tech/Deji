@@ -118,6 +118,7 @@ export async function getPaymentsService(tenantId, query = {}) {
     tenantId,
     ...(query.invoiceId ? { invoiceId: query.invoiceId } : {}),
     ...(query.status ? { status: query.status } : {}),
+    ...(query.method ? { method: query.method } : {}),
   };
 
   const [data, total] = await prisma.$transaction([

@@ -1,11 +1,24 @@
 import axios from "axios";
 import { openDB as idbOpenDB } from "idb";
 
-// Prefer VITE_API_URL, fallback to your Render host if env missing
-const baseURL =
-  import.meta.env.VITE_API_URL ||
-  "https://deji-api.onrender.com/api" ||
-  "http://localhost:5000/api";
+// Prefer VITE_API_URL, fallback to localhost or relative URL
+let baseURL = import.meta.env.VITE_API_URL;
+
+if (!baseURL) {
+  // Auto-detect Codespaces environment
+  if (typeof window !== "undefined" && window.location.hostname.includes("app.github.dev")) {
+    // In GitHub Codespaces: use relative URL to proxy through frontend
+    // This avoids tunnel authentication issues
+    baseURL = "/api";
+    console.log("🌐 Codespaces detected - Using relative backend proxy:", baseURL);
+  } else {
+    // Local development
+    baseURL = "http://localhost:3000/api";
+    console.log("💻 Local development - Using backend:", baseURL);
+  }
+} else {
+  console.log("📌 Using VITE_API_URL:", baseURL);
+}
 
 const api = axios.create({
   baseURL,
@@ -150,6 +163,69 @@ export async function updateTenantSettings(data) {
   return api.put("/tenant-settings", data);
 }
 
+export async function getInvoices(params = {}) {
+  return api.get("/invoices", { params });
+}
+
+export async function createInvoice(data) {
+  return api.post("/invoices", data);
+}
+
+export async function getInvoiceById(id) {
+  return api.get(`/invoices/${id}`);
+}
+
+export async function updateInvoice(id, data) {
+  return api.put(`/invoices/${id}`, data);
+}
+
+export async function deleteInvoice(id) {
+  return api.delete(`/invoices/${id}`);
+}
+
+// ===== Payments helpers =====
+export async function getPayments(params = {}) {
+  return api.get("/payments", { params });
+}
+
+export async function createPayment(data) {
+  return api.post("/payments", data);
+}
+
+export async function getPaymentById(id) {
+  return api.get(`/payments/${id}`);
+}
+
+export async function updatePayment(id, data) {
+  return api.put(`/payments/${id}`, data);
+}
+
+export async function deletePayment(id) {
+  return api.delete(`/payments/${id}`);
+}
+
+// ===== Ledger helpers =====
+export async function getLedgerEntries(params = {}) {
+  return api.get("/ledger/entries", { params });
+}
+
+export async function getTrialBalance() {
+  return api.get("/ledger/trial-balance");
+}
+
+export async function getIncomeStatement(params = {}) {
+  return api.get("/reports/income-statement", { params });
+}
+
+export async function getBalanceSheet() {
+  return api.get("/reports/balance-sheet");
+}
+
+export async function getFinancialRatios() {
+  return api.get("/reports/financial-ratios");
+}
+
+// ===== Reports helpers =====
 export async function getDashboardOverview() {
   return api.get("/reports/overview");
 }
@@ -162,4 +238,44 @@ export async function getLedgerReport(params = {}) {
   return api.get("/reports/ledger", { params });
 }
 
+// ===== Forms helpers =====
+export async function getForms(params = {}) {
+  return api.get("/forms", { params });
+}
+
+export async function getFormById(id) {
+  return api.get(`/forms/${id}`);
+}
+
+export async function createForm(data) {
+  return api.post("/forms", data);
+}
+
+export async function updateForm(id, data) {
+  return api.put(`/forms/${id}`, data);
+}
+
+export async function deleteForm(id) {
+  return api.delete(`/forms/${id}`);
+}
+
+export async function publishForm(id, isPublished) {
+  return api.post(`/forms/${id}/publish`, { isPublished });
+}
+
+export async function getFormSubmissions(formId, params = {}) {
+  return api.get(`/forms/${formId}/submissions`, { params });
+}
+
+export async function markSubmissionAsRead(submissionId) {
+  return api.patch(`/forms/submissions/${submissionId}/read`);
+}
+
+export async function getFormAnalytics(formId) {
+  return api.get(`/forms/${formId}/analytics`);
+}
+
+export async function submitForm(tenantId, formId, formData) {
+  return api.post(`/forms/${tenantId}/${formId}/submit`, formData);
+}
 export default api;

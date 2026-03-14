@@ -1,79 +1,98 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { login } from "../services/api";
+import api from "../services/api";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
+    setLoading(true);
 
     try {
-      // login() returns { token, user } or throws
-      const { token, user } = await login({ email, password });
+      const res = await api.post("/auth/login", { email, password });
 
-      // Defensive check in case API returns unexpected shape
-      if (!token || !user) {
-        console.error("❌ Unexpected login response:", { token, user });
+      if (res.data.token) {
+        localStorage.setItem("token", res.data.token);
+        console.log("✅ Logged in user:", res.data.user);
+        navigate("/");
+      } else {
         setError("Login failed. Invalid server response.");
-        return;
       }
-
-      console.log("✅ Logged in user:", user);
-      console.log("✅ JWT token:", token);
-
-      // redirect to dashboard (root)
-      navigate("/");
     } catch (err) {
-      // err may be an Axios error or other
       const message =
-        err?.response?.data?.message || err?.message || "Login failed. Check credentials.";
-      console.error("❌ Login error:", err?.response?.data || err?.message || err);
+        err?.response?.data?.message || "Login failed. Check your credentials.";
+      console.error("❌ Login error:", message);
       setError(message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <form
-        onSubmit={handleLogin}
-        className="bg-white p-6 rounded-xl shadow-md w-80"
-      >
-        <h2 className="text-xl font-bold mb-4 text-center">Login</h2>
+    <div className="flex items-center justify-center min-h-screen bg-gray-100 px-4">
+      <div className="w-full max-w-md bg-white shadow-lg rounded-2xl p-8">
+        <h2 className="text-2xl font-bold mb-2 text-center">Welcome Back</h2>
+        <p className="text-gray-600 text-sm text-center mb-6">
+          Sign in to access your workspace
+        </p>
 
         {error && (
-          <div className="mb-3 text-red-600 text-sm text-center">{error}</div>
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+            {error}
+          </div>
         )}
 
-        <input
-          type="email"
-          placeholder="Email"
-          className="w-full p-2 mb-3 border rounded"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
+        <form onSubmit={handleLogin} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Email Address
+            </label>
+            <input
+              type="email"
+              placeholder="your@email.com"
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
 
-        <input
-          type="password"
-          placeholder="Password"
-          className="w-full p-2 mb-3 border rounded"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Password
+            </label>
+            <input
+              type="password"
+              placeholder="••••••••"
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
 
-        <button
-          type="submit"
-          className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
-        >
-          Login
-        </button>
-      </form>
+          <button
+            type="submit"
+            className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium transition"
+            disabled={loading}
+          >
+            {loading ? "Signing In..." : "Sign In"}
+          </button>
+        </form>
+
+        <p className="mt-6 text-center text-sm text-gray-600">
+          Don't have an account?{" "}
+          <a href="/signup" className="text-blue-600 font-semibold hover:underline">
+            Create one
+          </a>
+        </p>
+      </div>
     </div>
   );
 }
