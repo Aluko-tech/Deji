@@ -43,7 +43,6 @@ router.use("/stripe", stripeRoutes);
 router.use("/health", healthRoutes);
 router.use("/uploads", uploadRoutes);
 router.use("/forms", formRoutes);
-router.use("/forms", formRoutes);
 
 // ── Protected routes ──
 router.use("/contacts", authenticate, contactRoutes);

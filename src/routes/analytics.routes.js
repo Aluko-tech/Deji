@@ -1,12 +1,23 @@
-import { Router } from "express";
-import { getProductProfitability, getProductDetails } from "../controllers/analytics.controller.js";
+import { Router } from 'express';
+import {
+  getProductProfitability,
+  getProductDetails,
+  getRevenueByProduct,
+  getCOGSByProduct,
+  getRevenueByRep,
+  getAnalyticsKPIs,
+} from '../controllers/analytics.controller.js';
 
 const router = Router();
 
-// GET /api/analytics/product-profitability
-router.get("/product-profitability", getProductProfitability);
+// Legacy endpoints (kept for backward compat)
+router.get('/product-profitability', getProductProfitability);
+router.get('/product/:id/details',   getProductDetails);
 
-// GET /api/analytics/product/:id/details
-router.get("/product/:id/details", getProductDetails);
+// New endpoints wired to frontend api.js
+router.get('/revenue-by-product', getRevenueByProduct);
+router.get('/cogs-by-product',    getCOGSByProduct);
+router.get('/revenue-by-rep',     getRevenueByRep);
+router.get('/kpis',               getAnalyticsKPIs);
 
 export default router;

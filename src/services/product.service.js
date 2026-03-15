@@ -78,9 +78,10 @@ export async function createProductService(tenantId, data) {
       });
     }
 
-    // 5 — Auto-assign initial stock to Main Warehouse
+    // 5 — Always create a WarehouseStock entry in Main Warehouse for non-service products
+    // (qty=0 is valid — it registers the product in the warehouse so stock adjustments work)
     const initialStock = Number(productData.stock) || 0;
-    if (initialStock > 0 && product.type !== 'service') {
+    if (product.type !== 'service') {
       const defaultWH = await getOrCreateDefaultWarehouse(tenantId, tx);
       await upsertWarehouseStock(tenantId, defaultWH.id, product.id, initialStock, tx);
     }

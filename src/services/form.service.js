@@ -166,19 +166,68 @@ export async function submitFormService(tenantId, formId, submissionData) {
     data: { submissionCount: { increment: 1 } },
   });
 
-  // If a contact with the email doesn't exist, create one
+  // ── Upsert Contact (email is not @unique on Contact — must scope by tenantId) ──
   if (email) {
-    await prisma.contact.upsert({
-      where: { email },
-      update: { phone: phone || undefined },
-      create: {
-        tenantId,
-        email,
-        name: name || email,
-        phone: phone || undefined,
-        source: 'FORM_SUBMISSION',
-      },
+    const existingContact = await prisma.contact.findFirst({
+      where: { tenantId, email },
     });
+    if (!existingContact) {
+      await prisma.contact.create({
+        data: {
+          tenantId,
+          email,
+          name: name || email,
+          phone: phone || undefined,
+          type: 'customer',
+        },
+      });
+    } else if (phone && !existingContact.phone) {
+      await prisma.contact.update({
+        where: { id: existingContact.id },
+        data: { phone },
+      });
+    }
+  }
+
+  // ── Auto-create Lead in CRM ──────────────────────────────────────────────────
+  // If email present: upsert so re-submissions don't duplicate the lead.
+  // If no email (name/phone only): always create — no unique key to dedupe on.
+  if (name || email || phone) {
+    if (email) {
+      await prisma.lead.upsert({
+        where: { tenantId_email: { tenantId, email } },
+        update: {
+          ...(phone ? { phone } : {}),
+          lastContactedAt: new Date(),
+        },
+        create: {
+          tenantId,
+          name:     name || email,
+          email,
+          phone:    phone || undefined,
+          source:   'form_submission',
+          formId,
+          formName: form.name,
+          status:   'new',
+          leadType: 'warm',
+          priority: 'medium',
+        },
+      });
+    } else {
+      await prisma.lead.create({
+        data: {
+          tenantId,
+          name:     name || phone || 'Unknown',
+          phone:    phone || undefined,
+          source:   'form_submission',
+          formId,
+          formName: form.name,
+          status:   'new',
+          leadType: 'warm',
+          priority: 'medium',
+        },
+      });
+    }
   }
 
   return submission;

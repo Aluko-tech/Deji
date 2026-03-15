@@ -419,12 +419,13 @@ export const registerUser = async (req, res) => {
     const defaultPerms = ROLE_PERMISSIONS[role] || ROLE_PERMISSIONS['staff'];
     const fname        = firstName || email.split('@')[0];
 
-    // Transaction — tenant + user created atomically
+    // Transaction — tenant + user + settings + subscription + warehouse created atomically
     let createdUser;
     await prisma.$transaction(async (tx) => {
       const tenant = await tx.tenant.create({
         data: { name: tenantName, language: 'en' },
       });
+
       createdUser = await tx.user.create({
         data: {
           email, password: hashed, role,
@@ -439,6 +440,54 @@ export const registerUser = async (req, res) => {
           verifyExpiry:  null,
         },
         include: { tenant: true },
+      });
+
+      // ── TenantSettings (needed by settings page, invoices, etc.) ──
+      await tx.tenantSettings.create({
+        data: {
+          tenantId:     tenant.id,
+          businessName: tenantName,
+          currency:     'NGN',
+          language:     'en',
+          timezone:     'Africa/Lagos',
+          invoicePrefix: 'INV-',
+          invoiceStart:  1000,
+          invoiceDueDays: 30,
+          taxRate:       0,
+          notifyByEmail: true,
+          notifyByWhatsApp: false,
+        },
+      });
+
+      // ── FREE subscription (needed by plan-limit middleware) ──
+      const now      = new Date();
+      const periodEnd = new Date(now);
+      periodEnd.setDate(periodEnd.getDate() + 30);
+      await tx.subscription.create({
+        data: {
+          tenantId:           tenant.id,
+          plan:               'FREE',
+          status:             'ACTIVE',
+          startedAt:          now,
+          currentPeriodStart: now,
+          currentPeriodEnd:   periodEnd,
+        },
+      });
+
+      // ── Default warehouse (needed by inventory from day one) ──
+      await tx.warehouse.create({
+        data: {
+          tenantId:  tenant.id,
+          name:      'Main Warehouse',
+          code:      'MAIN',
+          type:      'local',
+          country:   'Nigeria',
+          city:      'Lagos',
+          currency:  'NGN',
+          isActive:  true,
+          isDefault: true,
+          notes:     'Default warehouse — all new stock lands here first',
+        },
       });
     });
 
@@ -479,7 +528,7 @@ export const registerUser = async (req, res) => {
       if (field === 'name')  return res.status(409).json({ message: 'A workspace with this business name already exists.' });
       if (field === 'email') return res.status(409).json({ message: 'An account with this email already exists.' });
     }
-    res.status(500).json({ message: 'Registration failed: ' + err.message });
+    res.status(500).json({ message: 'Registration failed. Please try again.' });
   }
 };
 
@@ -534,7 +583,8 @@ export const loginUser = async (req, res) => {
       },
     });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error('Login error:', err);
+    res.status(500).json({ message: 'Login failed. Please try again.' });
   }
 };
 
