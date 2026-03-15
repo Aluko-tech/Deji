@@ -6,11 +6,14 @@ import { createLead, getLeads, getLeadById, updateLead, deleteLead, getLeadStats
 const router = express.Router();
 router.use(authenticate);
 
-router.get('/stats', authorize(['admin', 'staff']), getLeadStats);
-router.post('/', authorize(['admin', 'staff']), enforceLimit('leadsMax'), createLead);
-router.get('/', authorize(['admin', 'staff']), getLeads);
-router.get('/:id', authorize(['admin', 'staff']), getLeadById);
-router.put('/:id', authorize(['admin', 'staff']), updateLead);
-router.delete('/:id', authorize(['admin']), deleteLead);
+// Roles that can interact with leads (visibility is filtered server-side per role)
+const LEAD_ROLES = ['admin', 'manager', 'staff', 'sales', 'sales_rep', 'marketer', 'accountant'];
+
+router.get('/stats', authorize(LEAD_ROLES), getLeadStats);
+router.post('/', authorize(LEAD_ROLES), enforceLimit('leadsMax'), createLead);
+router.get('/', authorize(LEAD_ROLES), getLeads);
+router.get('/:id', authorize(LEAD_ROLES), getLeadById);
+router.put('/:id', authorize(LEAD_ROLES), updateLead);
+router.delete('/:id', authorize(['admin', 'manager']), deleteLead);
 
 export default router;

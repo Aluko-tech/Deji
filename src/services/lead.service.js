@@ -2,7 +2,7 @@ import prisma from '../config/prisma.js';
 
 const ALLOWED_FIELDS = new Set([
   'name','email','phone','company','status','source','notes',
-  'assignedTo','assignedById','formId','formName','campaignName',
+  'assignedTo','assignedById','createdBy','formId','formName','campaignName',
   'adSet','channel','leadType','priority','expectedValue',
   'followUpDate','lastContactedAt','convertedAt','lostReason',
 ]);
@@ -42,6 +42,11 @@ export async function createLeadService(tenantId, data, createdByUser = null) {
     leadData.notes = [leadData.notes, traceLines.join(' | ')].filter(Boolean).join('\n---\n');
   }
 
+  // Always store the creator's userId for role-based access control
+  if (createdByUser?.id) {
+    leadData.createdBy = createdByUser.id;
+  }
+
   return prisma.lead.create({
     data: {
       tenantId,
@@ -52,7 +57,10 @@ export async function createLeadService(tenantId, data, createdByUser = null) {
   });
 }
 
-export async function getLeadsService(tenantId, query = {}) {
+// Roles that see only their own assigned leads
+const ASSIGNED_ROLES = new Set(['staff', 'sales', 'sales_rep']);
+
+export async function getLeadsService(tenantId, query = {}, requester = null) {
   const {
     page = 1, limit = 50,
     status, source, assignedTo,
@@ -60,11 +68,27 @@ export async function getLeadsService(tenantId, query = {}) {
     search, formId,
   } = query;
 
+  // ── Role-based visibility ──────────────────────────────────────────────────
+  // admin / manager / accountant / inventory → see everything
+  // staff / sales / sales_rep               → only leads assigned to them
+  // marketer                                → only leads they created
+  let visibilityFilter = {};
+  if (requester) {
+    if (ASSIGNED_ROLES.has(requester.role)) {
+      // assignedTo stores the rep's email (existing convention)
+      visibilityFilter = { assignedTo: { equals: requester.email, mode: 'insensitive' } };
+    } else if (requester.role === 'marketer') {
+      visibilityFilter = { createdBy: requester.id };
+    }
+  }
+
   const where = {
     tenantId,
+    ...visibilityFilter,
     ...(status     && { status }),
     ...(source     && { source }),
-    ...(assignedTo && { assignedTo }),
+    // Allow explicit assignedTo override only if admin/manager (visibility already handles it otherwise)
+    ...(assignedTo && !visibilityFilter.assignedTo && { assignedTo }),
     ...(leadType   && { leadType }),
     ...(priority   && { priority }),
     ...(channel    && { channel }),

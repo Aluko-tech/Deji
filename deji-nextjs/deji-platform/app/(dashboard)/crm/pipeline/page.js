@@ -62,9 +62,7 @@ export default function PipelinePage() {
     try {
       if (!silent) setLoading(true);
       const res = await getLeads({ limit:500 });
-      let all = Array.isArray(res.data) ? res.data : res.data?.data || res.data?.leads || [];
-      if (me.role==="sales")    all = all.filter(l => l.assignedTo?.toLowerCase()===me.email?.toLowerCase() || l.assignedTo?.toLowerCase()===me.name?.toLowerCase());
-      if (me.role==="marketer") all = all.filter(l => l.marketerName?.toLowerCase()===me.name?.toLowerCase());
+      const all = Array.isArray(res.data) ? res.data : res.data?.data || res.data?.leads || [];
       setLeads(all);
       setLastRefresh(new Date());
     } catch(e) { console.error(e); }

@@ -226,6 +226,7 @@ model Lead {
   tags            Tag[]     @relation("LeadTags")
   assignedTo      String?
   assignedById    String?
+  createdBy       String?   // userId of the staff member who created this lead
   formId          String?
   formName        String?
   campaignName    String?

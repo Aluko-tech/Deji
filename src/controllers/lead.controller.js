@@ -20,7 +20,7 @@ export const createLead = async (req, res) => {
 
 export const getLeads = async (req, res) => {
   try {
-    const result = await getLeadsService(req.user.tenantId, req.query);
+    const result = await getLeadsService(req.user.tenantId, req.query, req.user);
     res.json({ total: result.total, data: result.leads, page: result.page, totalPages: result.totalPages });
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch leads', error: error.message });
