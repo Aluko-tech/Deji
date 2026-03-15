@@ -256,6 +256,8 @@ export default function DashboardLayout({ children }) {
   const [showNotifs, setShowNotifs]   = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [unreadCount, setUnreadCount] = useState(3);
+  const [tenantLogoUrl, setTenantLogoUrl]   = useState(null);
+  const [tenantBizName, setTenantBizName]   = useState(null);
   const notifRef   = useRef(null);
   const profileRef = useRef(null);
 
@@ -268,6 +270,13 @@ export default function DashboardLayout({ children }) {
     document.documentElement.classList.toggle("light", !isDark);
     window.addEventListener("online",  () => setOnline(true));
     window.addEventListener("offline", () => setOnline(false));
+
+    // Load tenant branding — non-blocking, silently ignored if request fails
+    api.get("/tenant-settings").then(res => {
+      const d = res.data?.data ?? res.data;
+      if (d?.logoUrl)      setTenantLogoUrl(d.logoUrl);
+      if (d?.businessName) setTenantBizName(d.businessName);
+    }).catch(() => {});
   }, []);
 
   // Close dropdowns on outside click
@@ -312,10 +321,13 @@ export default function DashboardLayout({ children }) {
 
         <div className="flex items-center justify-between p-4" style={{borderBottom:"1px solid var(--border)"}}>
           <Link href="/dashboard" className="flex items-center gap-3" onClick={() => setOpen(false)}>
-            <DejiLogo/>
+            {tenantLogoUrl
+              ? <img src={tenantLogoUrl} alt="Logo" className="w-9 h-9 rounded-xl object-cover flex-shrink-0"/>
+              : <img src="/icons/icon-192x192.png" alt="Deji" className="w-9 h-9 rounded-xl object-cover flex-shrink-0"/>
+            }
             <div>
               <p className="font-bold text-lg leading-none" style={{fontFamily:"Syne,sans-serif", color:"var(--text-primary)"}}>
-                Deji<span style={{color:"var(--primary)"}}>.</span>
+                {tenantBizName || "Deji"}<span style={{color:"var(--primary)"}}>.</span>
               </p>
               <p className="text-[9px] font-semibold uppercase tracking-widest" style={{color:"var(--text-muted)"}}>Business OS</p>
             </div>

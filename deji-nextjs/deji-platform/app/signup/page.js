@@ -60,8 +60,7 @@ export default function SignupPage() {
 
   const Logo = () => (
     <div className="flex items-center gap-3 justify-center">
-      <div className="w-10 h-10 rounded-2xl flex items-center justify-center font-black text-white"
-        style={{ background: "linear-gradient(135deg,#22c55e,#16a34a)", fontFamily: "Syne,sans-serif" }}>D</div>
+      <img src="/icons/icon-192x192.png" alt="Deji" className="w-10 h-10 rounded-2xl object-cover"/>
       <p className="font-black text-2xl" style={{ fontFamily: "Syne,sans-serif", color: "#f0fdf4" }}>
         Deji<span style={{ color: "#22c55e" }}>.</span>
       </p>
