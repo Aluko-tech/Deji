@@ -103,7 +103,7 @@ export default function AnalyticsPage() {
     const [ir, lr, pr, sr] = await Promise.allSettled([
       api.get("/invoices?limit=500"),
       api.get("/crm/leads?limit=500"),
-      api.get("/inventory?limit=500"),
+      api.get("/products?limit=500"),
       api.get("/auth/staff"),
     ]);
     setInvoices(ir.status === "fulfilled" ? safeArray(ir.value?.data) : []);

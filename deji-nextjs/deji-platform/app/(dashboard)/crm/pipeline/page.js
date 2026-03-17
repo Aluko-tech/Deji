@@ -4,14 +4,28 @@ import { Plus, Search, Filter, X, Phone, Calendar, DollarSign, Target, Award, Tr
 import { inRange, fmtDate } from "@/lib/dateUtils";
 import { getLeads, createLead, updateLead } from "@/lib/api";
 
+// ── Stages — must match Leads page exactly ────────────────────────────────────
 const STAGES = [
-  { id:"new",         label:"New",         emoji:"🆕", color:"#6366f1", bg:"rgba(99,102,241,0.12)"  },
-  { id:"contacted",   label:"Contacted",   emoji:"📞", color:"#f97316", bg:"rgba(249,115,22,0.12)"  },
-  { id:"qualified",   label:"Qualified",   emoji:"🔥", color:"#eab308", bg:"rgba(234,179,8,0.12)"   },
-  { id:"negotiation", label:"Negotiation", emoji:"💬", color:"#8b5cf6", bg:"rgba(139,92,246,0.12)"  },
-  { id:"won",         label:"Won",         emoji:"✅", color:"#22c55e", bg:"rgba(34,197,94,0.12)"   },
-  { id:"lost",        label:"Lost",        emoji:"❌", color:"#ef4444", bg:"rgba(239,68,68,0.12)"   },
+  { id:"assigned",   label:"Assigned",   emoji:"🆕", color:"#6366f1", bg:"rgba(99,102,241,0.12)"  },
+  { id:"contacted",  label:"Contacted",  emoji:"📞", color:"#f97316", bg:"rgba(249,115,22,0.12)"  },
+  { id:"qualified",  label:"Qualified",  emoji:"🔥", color:"#eab308", bg:"rgba(234,179,8,0.12)"   },
+  { id:"processing", label:"Processing", emoji:"💬", color:"#8b5cf6", bg:"rgba(139,92,246,0.12)"  },
+  { id:"delivered",  label:"Delivered",  emoji:"✅", color:"#22c55e", bg:"rgba(34,197,94,0.12)"   },
+  { id:"failed",     label:"Failed",     emoji:"❌", color:"#ef4444", bg:"rgba(239,68,68,0.12)"   },
+  { id:"lost",       label:"Lost",       emoji:"🚫", color:"#6b7280", bg:"rgba(107,114,128,0.12)" },
 ];
+
+// Map old stage values from DB to new ones so existing leads still show
+const LEGACY_MAP = {
+  new:         "assigned",
+  won:         "delivered",
+  cancelled:   "failed",
+  negotiation: "processing",
+};
+
+function normaliseStatus(status) {
+  return LEGACY_MAP[status] || status;
+}
 
 const TYPE_ICONS = { hot:"🔥", warm:"🌡️", cold:"❄️" };
 const PRIORITY_COLORS = { high:"text-red-400", medium:"text-orange-400", low:"text-green-400" };
@@ -22,9 +36,9 @@ const SOURCE_COLORS = {
 const AD_SOURCES = ["Facebook","Instagram","TikTok","Google","Ad Form","Website Form","Generic Webhook"];
 
 const EMPTY = {
-  name:"",phone:"",email:"",company:"",source:"Facebook",channel:"Facebook",
-  status:"new",leadType:"warm",priority:"medium",assignedTo:"",marketerName:"",
-  campaignName:"",adSet:"",expectedValue:"",followUpDate:"",notes:"",
+  name:"", phone:"", email:"", company:"", source:"Facebook", channel:"Facebook",
+  status:"assigned", leadType:"warm", priority:"medium", assignedTo:"", marketerName:"",
+  campaignName:"", adSet:"", expectedValue:"", followUpDate:"", notes:"",
 };
 
 function getMe() {
@@ -36,23 +50,21 @@ function getMe() {
 }
 
 export default function PipelinePage() {
-  const [leads,setLeads]         = useState([]);
-  const [loading,setLoading]     = useState(true);
-  const [search,setSearch]       = useState("");
-  const [showFilters,setShowFilters] = useState(false);
-  const [filters,setFilters]     = useState({rep:"all",marketer:"all",channel:"all",type:"all",dateFrom:"",dateTo:""});
-  const [showModal,setShowModal] = useState(false);
-  const [editLead,setEditLead]   = useState(null);
-  const [form,setForm]           = useState(EMPTY);
-  const [saving,setSaving]       = useState(false);
-  const [dragging,setDragging]   = useState(null);
-  const [dragOver,setDragOver]   = useState(null);
-  const [lastRefresh,setLastRefresh] = useState(new Date());
+  const [leads,       setLeads]       = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [search,      setSearch]      = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters,     setFilters]     = useState({rep:"all",marketer:"all",channel:"all",type:"all",dateFrom:"",dateTo:""});
+  const [showModal,   setShowModal]   = useState(false);
+  const [editLead,    setEditLead]    = useState(null);
+  const [form,        setForm]        = useState(EMPTY);
+  const [saving,      setSaving]      = useState(false);
+  const [dragging,    setDragging]    = useState(null);
+  const [dragOver,    setDragOver]    = useState(null);
+  const [lastRefresh, setLastRefresh] = useState(new Date());
   const me = getMe();
 
   useEffect(() => { fetchLeads(); }, []);
-
-  // Auto-refresh every 30s — catches incoming ad leads in real time
   useEffect(() => {
     const interval = setInterval(() => fetchLeads(true), 30000);
     return () => clearInterval(interval);
@@ -73,9 +85,10 @@ export default function PipelinePage() {
   const handleDragOver  = (e, id)   => { e.preventDefault(); setDragOver(id); };
   const handleDrop = async (e, stageId) => {
     e.preventDefault(); setDragOver(null);
-    if (!dragging || dragging.status===stageId) return;
+    if (!dragging || normaliseStatus(dragging.status)===stageId) return;
+    // Optimistic update
     setLeads(p => p.map(l => l.id===dragging.id ? {...l, status:stageId} : l));
-    try { await updateLead(dragging.id, { status:stageId }); }
+    try { await updateLead(dragging.id, { status: stageId }); }
     catch { fetchLeads(); }
     setDragging(null);
   };
@@ -99,7 +112,8 @@ export default function PipelinePage() {
     setForm({
       name:lead.name||"", phone:lead.phone||"", email:lead.email||"",
       company:lead.company||"", source:lead.source||"Facebook",
-      channel:lead.channel||"Facebook", status:lead.status||"new",
+      channel:lead.channel||"Facebook",
+      status: normaliseStatus(lead.status||"assigned"),
       leadType:lead.leadType||"warm", priority:lead.priority||"medium",
       assignedTo:lead.assignedTo||"", marketerName:lead.marketerName||"",
       campaignName:lead.campaignName||"", adSet:lead.adSet||"",
@@ -110,7 +124,7 @@ export default function PipelinePage() {
     setShowModal(true);
   };
 
-  const reps     = [...new Set(leads.map(l=>l.assignedTo).filter(Boolean))];
+  const reps      = [...new Set(leads.map(l=>l.assignedTo).filter(Boolean))];
   const marketers = [...new Set(leads.map(l=>l.marketerName).filter(Boolean))];
   const channels  = [...new Set(leads.map(l=>l.channel||l.source).filter(Boolean))];
   const adLeads   = leads.filter(l => AD_SOURCES.includes(l.source));
@@ -119,7 +133,7 @@ export default function PipelinePage() {
     if (search && !l.name?.toLowerCase().includes(search.toLowerCase()) &&
         !l.phone?.includes(search) && !l.campaignName?.toLowerCase().includes(search.toLowerCase()) &&
         !l.assignedTo?.toLowerCase().includes(search.toLowerCase())) return false;
-    if (filters.rep!=="all"     && l.assignedTo!==filters.rep) return false;
+    if (filters.rep!=="all"      && l.assignedTo!==filters.rep) return false;
     if (filters.marketer!=="all" && l.marketerName!==filters.marketer) return false;
     if (filters.channel!=="all"  && (l.channel||l.source)!==filters.channel) return false;
     if (filters.type!=="all"     && l.leadType!==filters.type) return false;
@@ -127,13 +141,14 @@ export default function PipelinePage() {
     return true;
   });
 
-  const stageLeads = (id) => filtered.filter(l => l.status===id);
+  const stageLeads = (id) => filtered.filter(l => normaliseStatus(l.status)===id);
   const stageVal   = (id) => stageLeads(id).reduce((s,l) => s+(l.expectedValue||0), 0);
-  const wonLeads   = leads.filter(l => l.status==="won");
-  const totalWon   = wonLeads.reduce((s,l) => s+(l.expectedValue||0), 0);
-  const totalPipe  = leads.filter(l => !["won","lost"].includes(l.status)).reduce((s,l) => s+(l.expectedValue||0), 0);
-  const convRate   = leads.length ? Math.round((wonLeads.length/leads.length)*100) : 0;
-  const avgDeal    = wonLeads.length ? Math.round(totalWon/wonLeads.length) : 0;
+
+  const deliveredLeads = leads.filter(l => normaliseStatus(l.status)==="delivered");
+  const totalDelivered = deliveredLeads.reduce((s,l) => s+(l.expectedValue||0), 0);
+  const totalPipe      = leads.filter(l => !["delivered","failed","lost"].includes(normaliseStatus(l.status))).reduce((s,l) => s+(l.expectedValue||0), 0);
+  const convRate       = leads.length ? Math.round((deliveredLeads.length/leads.length)*100) : 0;
+  const avgDeal        = deliveredLeads.length ? Math.round(totalDelivered/deliveredLeads.length) : 0;
 
   return (
     <div className="h-full flex flex-col space-y-4 pb-4 animate-fade-up">
@@ -149,8 +164,7 @@ export default function PipelinePage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => fetchLeads()}
-            className="btn-secondary flex items-center gap-2" title="Refresh">
+          <button onClick={() => fetchLeads()} className="btn-secondary flex items-center gap-2" title="Refresh">
             <RefreshCw size={14}/>
             <span className="text-xs hidden md:inline">
               {lastRefresh.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"})}
@@ -179,10 +193,10 @@ export default function PipelinePage() {
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 flex-shrink-0">
         {[
-          { label:"Pipeline Value", value:`₦${totalPipe.toLocaleString()}`, icon:<DollarSign size={16}/>, color:"#6366f1" },
-          { label:"Won Revenue",    value:`₦${totalWon.toLocaleString()}`,  icon:<Award size={16}/>,     color:"#22c55e" },
-          { label:"Conversion",     value:`${convRate}%`,                   icon:<Target size={16}/>,    color:"#f97316" },
-          { label:"Avg Deal Size",  value:`₦${avgDeal.toLocaleString()}`,   icon:<TrendingUp size={16}/>,color:"#eab308" },
+          { label:"Pipeline Value",   value:`₦${totalPipe.toLocaleString()}`,      icon:<DollarSign size={16}/>, color:"#6366f1" },
+          { label:"Delivered Revenue",value:`₦${totalDelivered.toLocaleString()}`, icon:<Award size={16}/>,      color:"#22c55e" },
+          { label:"Conversion",       value:`${convRate}%`,                         icon:<Target size={16}/>,     color:"#f97316" },
+          { label:"Avg Deal Size",    value:`₦${avgDeal.toLocaleString()}`,         icon:<TrendingUp size={16}/>, color:"#eab308" },
         ].map(k => (
           <div key={k.label} className="kpi-card flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -244,9 +258,9 @@ export default function PipelinePage() {
       ) : (
         <div className="flex gap-4 overflow-x-auto pb-4 flex-1">
           {STAGES.map(stage => {
-            const cards  = stageLeads(stage.id);
-            const val    = stageVal(stage.id);
-            const isDrop = dragOver===stage.id;
+            const cards   = stageLeads(stage.id);
+            const val     = stageVal(stage.id);
+            const isDrop  = dragOver===stage.id;
             const adCount = cards.filter(l => AD_SOURCES.includes(l.source)).length;
             return (
               <div key={stage.id}
@@ -279,8 +293,7 @@ export default function PipelinePage() {
                     </p>
                   )}
                   {adCount > 0 && (
-                    <p className="text-[9px] flex items-center gap-1 mt-1"
-                      style={{color:"#22c55e"}}>
+                    <p className="text-[9px] flex items-center gap-1 mt-1" style={{color:"#22c55e"}}>
                       <Zap size={8}/> {adCount} from ads
                     </p>
                   )}
@@ -306,14 +319,12 @@ export default function PipelinePage() {
                           border: `1px solid ${isAdLead ? "rgba(34,197,94,0.2)" : "var(--border)"}`,
                         }}>
 
-                        {/* Ad source indicator */}
                         {isAdLead && (
                           <div className="flex items-center gap-1 mb-2 -mt-0.5">
                             <Zap size={8} style={{color:"#22c55e"}}/>
                             <span className="text-[9px] font-bold"
                               style={{color: SOURCE_COLORS[lead.source] || "#22c55e"}}>
-                              {lead.source}
-                              {lead.campaignName ? ` · ${lead.campaignName}` : ""}
+                              {lead.source}{lead.campaignName ? ` · ${lead.campaignName}` : ""}
                             </span>
                           </div>
                         )}
@@ -333,23 +344,15 @@ export default function PipelinePage() {
                         </div>
 
                         {lead.phone && (
-                          <div className="flex items-center gap-1 text-[9px] mb-1.5"
-                            style={{color:"var(--text-muted)"}}>
+                          <div className="flex items-center gap-1 text-[9px] mb-1.5" style={{color:"var(--text-muted)"}}>
                             <Phone size={8}/>{lead.phone}
                           </div>
                         )}
 
-                        {lead.assignedTo && (
-                          <div className="text-[9px] mb-1" style={{color:"var(--text-muted)"}}>
-                            👤 {lead.assignedTo}
-                          </div>
-                        )}
-
-                        {!lead.assignedTo && (
-                          <div className="text-[9px] mb-1 font-semibold" style={{color:"#eab308"}}>
-                            ⏳ Unassigned
-                          </div>
-                        )}
+                        {lead.assignedTo
+                          ? <div className="text-[9px] mb-1" style={{color:"var(--text-muted)"}}>👤 {lead.assignedTo}</div>
+                          : <div className="text-[9px] mb-1 font-semibold" style={{color:"#eab308"}}>⏳ Unassigned</div>
+                        }
 
                         <div className="flex items-center justify-between pt-2"
                           style={{borderTop:"1px solid var(--border)"}}>
@@ -402,8 +405,7 @@ export default function PipelinePage() {
                 style={{fontFamily:"Playfair Display,serif", color:"var(--text-primary)"}}>
                 {editLead ? "Edit Lead" : "Add New Lead"}
               </h2>
-              <button onClick={() => { setShowModal(false); setEditLead(null); }}
-                style={{color:"var(--text-muted)"}}><X size={18}/></button>
+              <button onClick={() => { setShowModal(false); setEditLead(null); }} style={{color:"var(--text-muted)"}}><X size={18}/></button>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">

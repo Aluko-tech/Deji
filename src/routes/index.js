@@ -31,6 +31,7 @@ import websiteRoutes from "./website.routes.js";
 import { authenticate } from "../middleware/auth.js";
 import { localeMiddleware } from "../middleware/locale.middleware.js";
 import warehouseRouter from './warehouse.routes.js';
+import orderRouter from './order.routes.js';
 
 const router = Router();
 
@@ -67,5 +68,6 @@ router.use("/pos", authenticate, posRoutes);
 router.use("/website", authenticate, websiteRoutes);
 router.use("/webhooks", adWebhookRoutes);
 router.use('/warehouses', authenticate, warehouseRouter);
+router.use('/orders', orderRouter);
 
 export default router;

@@ -1,10 +1,3 @@
-// ═══════════════════════════════════════════════════════════════════════════
-// FILE:  /workspaces/Deji/src/routes/warehouse.routes.js   ← NEW FILE
-// Register in /workspaces/Deji/src/routes/index.js:
-//   import warehouseRouter from './warehouse.routes.js';
-//   app.use('/api/warehouses', warehouseRouter);
-// ═══════════════════════════════════════════════════════════════════════════
-
 import express from 'express';
 import prisma  from '../config/prisma.js';
 import { authenticate } from '../middleware/auth.js';
@@ -16,8 +9,14 @@ router.use(authenticate);
 const tid   = req => req.user.tenantId;
 const safeN = (v, d = 0) => { const n = Number(v); return isNaN(n) ? d : n; };
 
-// NOTE: /transfers routes MUST come BEFORE /:id routes so Express
-// doesn't treat the literal string "transfers" as a warehouse ID.
+// Helper: product include with variants
+const productInclude = {
+  include: {
+    variants: { where: { isActive: true }, orderBy: { sortOrder: 'asc' } },
+  },
+};
+
+// NOTE: /transfers, /default, /sync-stock MUST come BEFORE /:id routes
 
 // ── GET /api/warehouses/transfers ────────────────────────────────────────────
 router.get('/transfers', async (req, res) => {
@@ -66,7 +65,6 @@ router.post('/transfers', async (req, res) => {
     if (!product) return res.status(404).json({ message: 'Product not found' });
 
     const result = await prisma.$transaction(async (tx) => {
-      // 1 ── Verify stock in source
       const fromStock = await tx.warehouseStock.findUnique({
         where: { warehouseId_productId: { warehouseId: fromWarehouseId, productId } },
       });
@@ -74,21 +72,18 @@ router.post('/transfers', async (req, res) => {
       if (available < qty)
         throw new Error(`INSUFFICIENT:${fromWH.name} only has ${available} units (requested ${qty})`);
 
-      // 2 ── Deduct source
       await tx.warehouseStock.upsert({
         where:  { warehouseId_productId: { warehouseId: fromWarehouseId, productId } },
         update: { quantity: { decrement: qty } },
         create: { warehouseId: fromWarehouseId, productId, tenantId: tid(req), quantity: 0 },
       });
 
-      // 3 ── Add destination
       await tx.warehouseStock.upsert({
         where:  { warehouseId_productId: { warehouseId: toWarehouseId, productId } },
         update: { quantity: { increment: qty } },
         create: { warehouseId: toWarehouseId, productId, tenantId: tid(req), quantity: qty },
       });
 
-      // 4 ── StockAuditLog (your existing model)
       await tx.stockAuditLog.create({
         data: {
           tenantId:    tid(req), productId,
@@ -99,7 +94,6 @@ router.post('/transfers', async (req, res) => {
         },
       });
 
-      // 5 ── Auto-log delivery fee → Ledger (your existing LedgerEntry + Account models)
       let ledgerEntryId = null;
       if (fee > 0) {
         let account = await tx.account.findFirst({
@@ -115,7 +109,7 @@ router.post('/transfers', async (req, res) => {
             tenantId:    tid(req),
             type:        'EXPENSE',
             amount:      fee,
-            description: `Stock transfer: ${product.name} ×${qty} · ${fromWH.name} → ${toWH.name}${carrier ? ` via ${carrier}` : ''}`,
+            description: `Stock transfer: ${product.name} x${qty} · ${fromWH.name} → ${toWH.name}${carrier ? ` via ${carrier}` : ''}`,
             accountId:   account.id,
             reference:   `TRF-${Date.now()}`,
           },
@@ -123,7 +117,6 @@ router.post('/transfers', async (req, res) => {
         ledgerEntryId = entry.id;
       }
 
-      // 6 ── Create StockTransfer record
       return tx.stockTransfer.create({
         data: {
           tenantId: tid(req), fromWarehouseId, toWarehouseId, productId,
@@ -172,9 +165,7 @@ router.patch('/transfers/:id', async (req, res) => {
   }
 });
 
-
 // ── GET /api/warehouses/default ──────────────────────────────────────────────
-// Returns the tenant's default (Main) warehouse, creating it if needed.
 router.get('/default', async (req, res) => {
   try {
     let wh = await prisma.warehouse.findFirst({
@@ -183,7 +174,11 @@ router.get('/default', async (req, res) => {
       include: {
         warehouseStocks: {
           include: {
-            product: { select: { id:true, name:true, sku:true, stock:true } },
+            product: {
+              include: {
+                variants: { where: { isActive: true }, orderBy: { sortOrder: 'asc' } },
+              },
+            },
           },
         },
       },
@@ -212,6 +207,45 @@ router.get('/default', async (req, res) => {
   }
 });
 
+// ── POST /api/warehouses/sync-stock ──────────────────────────────────────────
+router.post('/sync-stock', async (req, res) => {
+  try {
+    const tenantId = tid(req);
+    let wh = await prisma.warehouse.findFirst({
+      where: { tenantId, isDefault: true, isActive: true },
+    });
+    if (!wh) return res.status(404).json({ message: 'No default warehouse found' });
+
+    const products = await prisma.product.findMany({
+      where:   { tenantId, type: { not: 'service' } },
+      include: { variants: { where: { isActive: true } } },
+    });
+
+    let synced = 0;
+    for (const p of products) {
+      const stock = p.variants?.length
+        ? p.variants.reduce((s, v) => s + (Number(v.stock) || 0), 0)
+        : (Number(p.stock) || 0);
+
+      await prisma.warehouseStock.upsert({
+        where:  { warehouseId_productId: { warehouseId: wh.id, productId: p.id } },
+        update: { quantity: stock },
+        create: { tenantId, warehouseId: wh.id, productId: p.id, quantity: stock },
+      });
+      synced++;
+    }
+
+    res.json({
+      message: `Synced ${synced} products to ${wh.name}`,
+      total:   products.length,
+      synced,
+    });
+  } catch (e) {
+    console.error('[SYNC STOCK]', e.message);
+    res.status(500).json({ message: 'Sync failed: ' + e.message });
+  }
+});
+
 // ── GET /api/warehouses ───────────────────────────────────────────────────────
 router.get('/', async (req, res) => {
   try {
@@ -221,8 +255,9 @@ router.get('/', async (req, res) => {
         warehouseStocks: {
           include: {
             product: {
-              select: { id:true, name:true, sku:true, stock:true,
-                        lowStockThreshold:true, category:true, imageUrl:true },
+              include: {
+                variants: { where: { isActive: true }, orderBy: { sortOrder: 'asc' } },
+              },
             },
           },
         },
@@ -274,7 +309,6 @@ router.patch('/:id', async (req, res) => {
       data[k] = k === 'defaultDeliveryFee' ? safeN(req.body[k]) : req.body[k];
   }
   try {
-    // If setting as default, unset all other defaults first
     if (data.isDefault === true) {
       await prisma.warehouse.updateMany({
         where: { tenantId: tid(req), isDefault: true },
@@ -292,7 +326,7 @@ router.patch('/:id', async (req, res) => {
   }
 });
 
-// ── DELETE /api/warehouses/:id  (soft-delete — keeps transfer history) ────────
+// ── DELETE /api/warehouses/:id ────────────────────────────────────────────────
 router.delete('/:id', async (req, res) => {
   try {
     const wh = await prisma.warehouse.findFirst({ where: { id: req.params.id, tenantId: tid(req) } });
@@ -317,8 +351,9 @@ router.get('/:id/stock', async (req, res) => {
       where: { warehouseId: req.params.id, tenantId: tid(req) },
       include: {
         product: {
-          select: { id:true, name:true, sku:true, category:true,
-                    stock:true, lowStockThreshold:true, imageUrl:true },
+          include: {
+            variants: { where: { isActive: true }, orderBy: { sortOrder: 'asc' } },
+          },
         },
       },
       orderBy: { product: { name: 'asc' } },
@@ -348,36 +383,3 @@ router.put('/:id/stock', async (req, res) => {
 });
 
 export default router;
-// ── POST /api/warehouses/sync-stock ──────────────────────────────────────────
-// Backfills warehouseStock for all products that have stock > 0 but no entry
-router.post('/sync-stock', async (req, res) => {
-  try {
-    const tenantId = tid(req);
-    let wh = await prisma.warehouse.findFirst({
-      where: { tenantId, isDefault: true, isActive: true },
-    });
-    if (!wh) return res.status(404).json({ message: 'No default warehouse found' });
-
-    const products = await prisma.product.findMany({
-      where: { tenantId, type: { not: 'service' }, stock: { gt: 0 } },
-      select: { id: true, stock: true, name: true },
-    });
-
-    let synced = 0;
-    for (const p of products) {
-      const existing = await prisma.warehouseStock.findUnique({
-        where: { warehouseId_productId: { warehouseId: wh.id, productId: p.id } },
-      });
-      if (!existing) {
-        await prisma.warehouseStock.create({
-          data: { tenantId, warehouseId: wh.id, productId: p.id, quantity: p.stock },
-        });
-        synced++;
-      }
-    }
-    res.json({ message: `Synced ${synced} products to ${wh.name}`, total: products.length, synced });
-  } catch (e) {
-    console.error('[SYNC STOCK]', e.message);
-    res.status(500).json({ message: 'Sync failed: ' + e.message });
-  }
-});

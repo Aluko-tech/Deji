@@ -10,8 +10,8 @@ export function calculateInvoiceTotals(lineItems, taxRate = 0, discount = 0) {
   return { subtotal, tax, discount: Number(discount), total };
 }
 
-async function ensureAccount(tx, tenantId, name, type) {
-  return tx.account.upsert({
+async function ensureAccount(client, tenantId, name, type) {
+  return client.account.upsert({
     where:  { id: `${tenantId}-${name}` },
     update: {},
     create: { id: `${tenantId}-${name}`, tenantId, name, type },
@@ -60,6 +60,7 @@ export async function createInvoiceWithStock(tenantId, data) {
   const cached = getIdempotentResponse(tenantId, INVOICE_SCOPE, idempotencyKey);
   if (cached) return cached;
 
+  // ── Step 1: Core invoice + stock deduction inside transaction (keep it lean) ──
   const created = await prisma.$transaction(async (tx) => {
     const productIds = lineItems.map(item => item.productId).filter(Boolean);
     const products   = productIds.length
@@ -127,7 +128,7 @@ export async function createInvoiceWithStock(tenantId, data) {
 
     const dbLineItems = preparedLineItems.map(({ warehouseId: _wh, ...rest }) => rest);
 
-    const invoice = await tx.invoice.create({
+    return tx.invoice.create({
       data: {
         tenantId, contactId, invoiceNumber,
         status: 'PENDING', issueDate: new Date(),
@@ -138,19 +139,31 @@ export async function createInvoiceWithStock(tenantId, data) {
       },
       include: { lineItems: true, contact: true },
     });
+  }, { timeout: 15000 });
 
-    const ar      = await ensureAccount(tx, tenantId, 'Accounts Receivable', 'ASSET');
-    const revenue = await ensureAccount(tx, tenantId, 'Sales Revenue',       'REVENUE');
-
-    await tx.ledgerEntry.createMany({
-      data: [
-        { tenantId, accountId: ar.id,      type: 'INCOME', amount: totals.total, description: `Invoice ${invoice.invoiceNumber} receivable`, reference: invoice.id },
-        { tenantId, accountId: revenue.id, type: 'INCOME', amount: totals.total, description: `Invoice ${invoice.invoiceNumber} revenue`,    reference: invoice.id },
-      ],
+  // ── Step 2: Ledger entries OUTSIDE transaction (avoids Supabase 5s timeout) ──
+  try {
+    const ar      = await ensureAccount(prisma, tenantId, 'Accounts Receivable', 'ASSET');
+    const revenue = await ensureAccount(prisma, tenantId, 'Sales Revenue',       'REVENUE');
+    await prisma.ledgerEntry.create({
+      data: {
+        tenantId, accountId: ar.id, type: 'INCOME',
+        amount:      created.total,
+        description: `Invoice ${created.invoiceNumber} receivable`,
+        reference:   created.id,
+      },
     });
-
-    return invoice;
-  });
+    await prisma.ledgerEntry.create({
+      data: {
+        tenantId, accountId: revenue.id, type: 'INCOME',
+        amount:      created.total,
+        description: `Invoice ${created.invoiceNumber} revenue`,
+        reference:   created.id,
+      },
+    });
+  } catch (e) {
+    console.error('[LEDGER] Failed to create ledger entries for invoice', created.invoiceNumber, e.message);
+  }
 
   setIdempotentResponse(tenantId, INVOICE_SCOPE, idempotencyKey, created);
   return created;
@@ -174,7 +187,7 @@ export async function getInvoicesService(tenantId, query = {}) {
 
 export async function getInvoiceByIdService(tenantId, id) {
   return prisma.invoice.findFirst({
-    where: { id, tenantId },
+    where:   { id, tenantId },
     include: { contact: true, lineItems: true, payments: true },
   });
 }

@@ -3,42 +3,34 @@ import fs from "fs";
 import path from "path";
 import cloudinary from "../utils/cloudinary.js";
 
-export const uploadLogo = async (req, res) => {
+async function uploadFile(req, res, folder, localSubdir) {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: "No file uploaded" });
-    }
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
     const provider = process.env.UPLOAD_PROVIDER || "cloudinary";
 
     if (provider === "cloudinary") {
-      // upload to cloudinary
       const result = await cloudinary.uploader.upload(req.file.path, {
-        folder: "deji-api/logos",
+        folder: `deji-api/${folder}`,
         resource_type: "image",
       });
-
-      // remove temp file
-      try { fs.unlinkSync(req.file.path); } catch (e) {}
-
+      try { fs.unlinkSync(req.file.path); } catch {}
       return res.json({ url: result.secure_url });
     } else {
-      // local provider: we serve /uploads static from express app root
-      const destFolder = path.join(process.cwd(), "uploads", "logos");
+      const destFolder = path.join(process.cwd(), "uploads", localSubdir);
       fs.mkdirSync(destFolder, { recursive: true });
-
       const destPath = path.join(destFolder, req.file.filename);
       fs.renameSync(req.file.path, destPath);
-
-      const url = `/uploads/logos/${req.file.filename}`;
-      return res.json({ url });
+      return res.json({ url: `/uploads/${localSubdir}/${req.file.filename}` });
     }
   } catch (err) {
     console.error("Upload error:", err);
-    // cleanup tmp file on error
-    if (req.file && req.file.path && fs.existsSync(req.file.path)) {
-      try { fs.unlinkSync(req.file.path); } catch (e) {}
+    if (req.file?.path && fs.existsSync(req.file.path)) {
+      try { fs.unlinkSync(req.file.path); } catch {}
     }
     res.status(500).json({ error: "Upload failed" });
   }
-};
+}
+
+export const uploadLogo  = (req, res) => uploadFile(req, res, "logos",    "logos");
+export const uploadImage = (req, res) => uploadFile(req, res, "products",  "products");

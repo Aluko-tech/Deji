@@ -43,11 +43,22 @@ async function upsertWarehouseStock(tenantId, warehouseId, productId, quantity, 
   });
 }
 
+// Extract variants array from customFields or top-level variants key
+function extractVariants(data) {
+  const top = data.variants;
+  const cf  = data.customFields?.variants;
+  // Accept either location; prefer top-level if present
+  if (Array.isArray(top) && top.length) return top;
+  if (Array.isArray(cf)  && cf.length)  return cf;
+  return [];
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // CREATE PRODUCT
 // ─────────────────────────────────────────────────────────────────────────────
 export async function createProductService(tenantId, data) {
-  const { volumeDiscounts, bundleItems, complementaryProducts, ...productData } = data;
+  const { volumeDiscounts, bundleItems, complementaryProducts, variants: _v, ...productData } = data;
+  const variants = extractVariants(data);
 
   const result = await prisma.$transaction(async (tx) => {
     // 1 — Create the product
@@ -78,9 +89,29 @@ export async function createProductService(tenantId, data) {
       });
     }
 
-    // 5 — Always create a WarehouseStock entry in Main Warehouse for non-service products
-    // (qty=0 is valid — it registers the product in the warehouse so stock adjustments work)
-    const initialStock = Number(productData.stock) || 0;
+    // 5 — Create ProductVariant records (proper DB table)
+    if (variants.length) {
+      await tx.productVariant.createMany({
+        data: variants.map((v, i) => ({
+          tenantId,
+          productId:    product.id,
+          name:         v.name || `Variant ${i + 1}`,
+          sku:          v.sku  || null,
+          costPrice:    Number(v.costPrice)    || null,
+          sellingPrice: Number(v.sellingPrice) || null,
+          stock:        Number(v.stock)        || 0,
+          imageUrl:     v.imageUrl             || null,
+          sortOrder:    i,
+        })),
+      });
+    }
+
+   // 6 - Always create a WarehouseStock entry in Main Warehouse for non-service products
+    const variantStock = variants.length
+      ? variants.reduce((s, v) => s + (Number(v.stock) || 0), 0)
+      : 0;
+    const initialStock = variantStock > 0 ? variantStock : (Number(productData.stock) || 0);
+
     if (product.type !== 'service') {
       const defaultWH = await getOrCreateDefaultWarehouse(tenantId, tx);
       await upsertWarehouseStock(tenantId, defaultWH.id, product.id, initialStock, tx);
@@ -91,7 +122,6 @@ export async function createProductService(tenantId, data) {
 
   return getProductByIdService(tenantId, result.id);
 }
-
 // ─────────────────────────────────────────────────────────────────────────────
 // GET ALL PRODUCTS
 // ─────────────────────────────────────────────────────────────────────────────
@@ -119,6 +149,7 @@ export async function getProductsService(tenantId, query = {}) {
         bundleItems:       { include: { product: { select: { id:true, name:true, stock:true, price:true } } } },
         complementaryFrom: { include: { complement: { select: { id:true, name:true, price:true, imageUrl:true } } } },
         warehouseStocks:   { include: { warehouse: { select: { id:true, name:true, country:true, city:true } } } },
+        variants:          { orderBy: { sortOrder: 'asc' }, where: { isActive: true } },
       },
     }),
     prisma.product.count({ where }),
@@ -139,6 +170,7 @@ export async function getProductByIdService(tenantId, id) {
       complementaryFrom: { include: { complement: { select: { id:true, name:true, price:true, imageUrl:true } } } },
       stockAuditLogs:    { orderBy: { createdAt: 'desc' }, take: 20 },
       warehouseStocks:   { include: { warehouse: { select: { id:true, name:true, country:true, city:true, type:true } } } },
+      variants:          { orderBy: { sortOrder: 'asc' }, where: { isActive: true } },
     },
   });
 }
@@ -147,7 +179,8 @@ export async function getProductByIdService(tenantId, id) {
 // UPDATE PRODUCT
 // ─────────────────────────────────────────────────────────────────────────────
 export async function updateProductService(tenantId, id, data) {
-  const { volumeDiscounts, bundleItems, complementaryProducts, ...productData } = data;
+  const { volumeDiscounts, bundleItems, complementaryProducts, variants: _v, ...productData } = data;
+  const variants = extractVariants(data);
 
   await prisma.$transaction(async (tx) => {
     const existing = await tx.product.findFirst({ where: { id, tenantId } });
@@ -206,6 +239,28 @@ export async function updateProductService(tenantId, id, data) {
         });
       }
     }
+
+    // Replace ProductVariant records when variants array is provided in the payload
+    const hasVariantData = Array.isArray(data.variants)
+      || Array.isArray(data.customFields?.variants);
+    if (hasVariantData) {
+      await tx.productVariant.deleteMany({ where: { productId: id } });
+      if (variants.length) {
+        await tx.productVariant.createMany({
+          data: variants.map((v, i) => ({
+            tenantId,
+            productId:    id,
+            name:         v.name || `Variant ${i + 1}`,
+            sku:          v.sku  || null,
+            costPrice:    Number(v.costPrice)    || null,
+            sellingPrice: Number(v.sellingPrice) || null,
+            stock:        Number(v.stock)        || 0,
+            imageUrl:     v.imageUrl             || null,
+            sortOrder:    i,
+          })),
+        });
+      }
+    }
   });
 
   return getProductByIdService(tenantId, id);
@@ -215,6 +270,14 @@ export async function updateProductService(tenantId, id, data) {
 // DELETE PRODUCT
 // ─────────────────────────────────────────────────────────────────────────────
 export async function deleteProductService(tenantId, id) {
+  // Verify ownership
+  const product = await prisma.product.findFirst({ where: { id, tenantId } });
+  if (!product) throw new Error('Product not found');
+
+  // Delete all related records first (order matters for FK constraints)
+  await prisma.stockAuditLog.deleteMany({ where: { productId: id } });
+  await prisma.lowStockAlert.deleteMany({ where: { productId: id } });
+  await prisma.productVariant.deleteMany({ where: { productId: id } });
   await prisma.bundleItem.deleteMany({ where: { OR: [{ bundleId: id }, { productId: id }] } });
   await prisma.complementaryProduct.deleteMany({ where: { OR: [{ productId: id }, { complementId: id }] } });
   await prisma.volumeDiscount.deleteMany({ where: { productId: id } });

@@ -12,6 +12,7 @@ import {
   updateInventoryProduct,
   deleteInventoryProduct,
   adjustStock,
+  uploadImage,
 } from "@/lib/api";
 
 const CATEGORIES = [
@@ -63,7 +64,27 @@ function genSKU(name, variant) {
 
 function ProductImage({ value, onChange, size="md" }) {
   const ref = useRef();
+  const [uploading, setUploading] = useState(false);
   const dim = size==="sm" ? "w-12 h-12" : "w-20 h-20";
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { alert("Image must be under 5MB"); return; }
+    e.target.value = "";
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await uploadImage(fd);
+      onChange(res.data?.url || "");
+    } catch (err) {
+      alert(err.message || "Image upload failed");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <div className="flex items-center gap-3">
       {value ? (
@@ -72,23 +93,20 @@ function ProductImage({ value, onChange, size="md" }) {
           <button type="button" onClick={()=>onChange("")} className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center"><X size={8}/></button>
         </div>
       ) : (
-        <div onClick={()=>ref.current?.click()} className={`${dim} rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer flex-shrink-0`} style={{borderColor:"var(--border)",color:"var(--text-muted)"}}>
-          <ImageIcon size={size==="sm"?14:18}/>
-          {size!=="sm"&&<span className="text-[10px] mt-1">Photo</span>}
+        <div onClick={()=>!uploading&&ref.current?.click()} className={`${dim} rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer flex-shrink-0`} style={{borderColor:"var(--border)",color:"var(--text-muted)"}}>
+          {uploading ? <RefreshCw size={size==="sm"?12:16} className="animate-spin"/> : <ImageIcon size={size==="sm"?14:18}/>}
+          {size!=="sm"&&<span className="text-[10px] mt-1">{uploading?"Uploading…":"Photo"}</span>}
         </div>
       )}
       <div>
-        <button type="button" onClick={()=>ref.current?.click()} className="btn-secondary text-xs py-1 px-2.5 flex items-center gap-1">
-          <Upload size={10}/> {value?"Change":"Upload"}
+        <button type="button" onClick={()=>!uploading&&ref.current?.click()} disabled={uploading}
+          className="btn-secondary text-xs py-1 px-2.5 flex items-center gap-1">
+          {uploading ? <RefreshCw size={10} className="animate-spin"/> : <Upload size={10}/>}
+          {uploading ? "Uploading…" : value ? "Change" : "Upload"}
         </button>
-        {size!=="sm"&&<p className="text-[10px] mt-1" style={{color:"var(--text-muted)"}}>PNG/JPG max 2MB</p>}
+        {size!=="sm"&&<p className="text-[10px] mt-1" style={{color:"var(--text-muted)"}}>PNG/JPG max 5MB</p>}
       </div>
-      <input ref={ref} type="file" accept="image/*" className="hidden" onChange={e=>{
-        const file=e.target.files?.[0]; if(!file) return;
-        if(file.size>2*1024*1024){alert("Image must be under 2MB");return;}
-        const reader=new FileReader(); reader.onload=ev=>onChange(ev.target.result); reader.readAsDataURL(file);
-        e.target.value="";
-      }}/>
+      <input ref={ref} type="file" accept="image/*" className="hidden" onChange={handleFile}/>
     </div>
   );
 }
@@ -102,7 +120,16 @@ function StockBadge({p}) {
   return <span className="badge badge-green text-xs">In Stock</span>;
 }
 
+function getMe() {
+  if (typeof window === "undefined") return { role: "admin" };
+  try { return JSON.parse(localStorage.getItem("user") || "{}"); } catch { return { role: "admin" }; }
+}
+
 export default function InventoryPage() {
+  const me = getMe();
+  const canEdit   = ["admin","manager","inventory","staff"].includes(me.role);
+  const canDelete = ["admin","manager"].includes(me.role);
+
   const [products,     setProducts]     = useState([]);
   const { format, symbol } = useCurrency();
   const [loading,      setLoading]      = useState(true);
@@ -124,16 +151,27 @@ export default function InventoryPage() {
   // Normalize a product from backend schema to frontend shape
   const normalizeProduct = (p) => {
     const cf = p.customFields || {};
+    // Prefer DB ProductVariant records; fall back to customFields JSON for legacy data
+    const dbVariants = Array.isArray(p.variants) && p.variants.length ? p.variants : null;
+    const cfVariants = Array.isArray(cf.variants) && cf.variants.length ? cf.variants : null;
+    const variants = (dbVariants || cfVariants || []).map(v => ({
+      name:         v.name         || "",
+      sku:          v.sku          || "",
+      costPrice:    v.costPrice    ?? 0,
+      sellingPrice: v.sellingPrice ?? 0,
+      stock:        v.stock        ?? 0,
+      imageUrl:     v.imageUrl     || "",
+    }));
     return {
       ...p,
-      sellingPrice:  p.price ?? p.sellingPrice ?? 0,   // schema uses "price"
+      sellingPrice:  p.price ?? p.sellingPrice ?? 0,
       brand:         cf.brand         ?? p.brand         ?? "",
       taxRate:       cf.taxRate       ?? p.taxRate       ?? 0,
       discountType:  cf.discountType  ?? p.discountType  ?? "none",
       discountValue: cf.discountValue ?? p.discountValue ?? 0,
       hasVariants:   cf.hasVariants   ?? p.hasVariants   ?? false,
       variantLabel:  cf.variantLabel  ?? p.variantLabel  ?? null,
-      variants:      cf.variants      ?? p.variants      ?? [],
+      variants,
     };
   };
 
@@ -251,7 +289,7 @@ export default function InventoryPage() {
       customVariantName: (p.variantLabel || cf.variantLabel) &&
         !VARIANT_TYPES.find(v => v.label === (p.variantLabel||cf.variantLabel))
         ? (p.variantLabel||cf.variantLabel) : "",
-      variants: (p.variants || cf.variants || []).map(v => ({
+      variants: (p.variants || []).map(v => ({
         name:         v.name         || "",
         sku:          v.sku          || "",
         costPrice:    v.costPrice    ?? 0,
@@ -283,10 +321,18 @@ export default function InventoryPage() {
 
   const outOfStock = products.filter(p=>!p.isBundle&&!p.hasVariants&&p.stock<=0);
   const lowStock   = products.filter(p=>!p.isBundle&&!p.hasVariants&&p.stock>0&&p.stock<=(p.lowStockThreshold||5));
-  const stockValue = products.reduce((s,p)=>{
-    if(p.hasVariants&&p.variants?.length) return s+p.variants.reduce((vs,v)=>vs+(Number(v.costPrice)||0)*(Number(v.stock)||0),0);
-    return s+(Number(p.costPrice)||0)*(Number(p.stock)||0);
-  },0);
+  const stockValue = products.reduce((s, p) => {
+  if (p.hasVariants && p.variants?.length) {
+    return s + p.variants.reduce((vs, v) => {
+      const cost  = parseFloat(v.costPrice)  || 0;
+      const stock = parseFloat(v.stock)      || 0;
+      return vs + (cost * stock);
+    }, 0);
+  }
+  const cost  = parseFloat(p.costPrice)  || 0;
+  const stock = parseFloat(p.stock)      || 0;
+  return s + (cost * stock);
+}, 0);
   const totalUnits = products.reduce((s,p)=>{
     if(p.hasVariants&&p.variants?.length) return s+p.variants.reduce((vs,v)=>vs+(Number(v.stock)||0),0);
     return s+(Number(p.stock)||0);
@@ -321,11 +367,11 @@ export default function InventoryPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="page-title">Inventory</h1>
-          <p className="page-subtitle">{products.length} products · {totalUnits.toLocaleString()} units · {format(stockValue.toLocaleString())}</p>
+          <p className="page-subtitle">{products.length} products · {totalUnits.toLocaleString()} units · {format(stockValue)}</p>
         </div>
         <div className="flex gap-2">
           <button onClick={fetchProducts} className="btn-secondary"><RefreshCw size={13}/></button>
-          <button onClick={openNew} className="btn-primary flex items-center gap-2"><Plus size={15}/> Add Product</button>
+          {canEdit && <button onClick={openNew} className="btn-primary flex items-center gap-2"><Plus size={15}/> Add Product</button>}
         </div>
       </div>
 
@@ -334,7 +380,7 @@ export default function InventoryPage() {
           {label:"Total Products",value:products.length,             icon:"📦",color:"var(--primary)"},
           {label:"Low Stock",     value:lowStock.length,              icon:"⚠️",color:"#fb923c"       },
           {label:"Out of Stock",  value:outOfStock.length,            icon:"🚫",color:"#ef4444"       },
-          {label:"Stock Value",   value:format(stockValue.toLocaleString()),icon:"💰",color:"#22c55e"    },
+          {label:"Stock Value",   value:format(stockValue),icon:"💰",color:"#22c55e"    },
         ].map(k=>(
           <div key={k.label} className="kpi-card">
             <div className="text-2xl mb-1">{k.icon}</div>
@@ -385,7 +431,7 @@ export default function InventoryPage() {
           <div className="p-12 text-center">
             <div className="text-5xl mb-3">📦</div>
             <p className="mb-4" style={{color:"var(--text-muted)"}}>No products yet. Add your first product.</p>
-            <button onClick={openNew} className="btn-primary">Add First Product</button>
+            {canEdit && <button onClick={openNew} className="btn-primary">Add First Product</button>}
           </div>
         ):filtered.length===0?(
           <div className="p-8 text-center"><div className="text-4xl mb-3">🔍</div><p style={{color:"var(--text-muted)"}}>No products match your filters</p></div>
@@ -438,13 +484,13 @@ export default function InventoryPage() {
                               <Layers size={10}/>{isExpanded?<ChevronUp size={10}/>:<ChevronDown size={10}/>}
                             </button>
                           )}
-                          {!p.isBundle&&!p.hasVariants&&(
+                          {canEdit&&!p.isBundle&&!p.hasVariants&&(
                             <button onClick={()=>{setShowPurchase(p);setPurchase({adjustment:1,costPrice:p.costPrice||"",supplier:"",note:""});}}
                               className="text-xs px-2 py-1 rounded-lg font-semibold"
                               style={{background:"var(--primary-dim)",color:"var(--primary)"}}>+ Stock</button>
                           )}
-                          <button onClick={()=>openEdit(p)} className="w-7 h-7 rounded-lg flex items-center justify-center" style={{background:"var(--bg-hover)",color:"var(--text-muted)"}}><Edit size={12}/></button>
-                          <button onClick={()=>handleDelete(p.id)} className="w-7 h-7 rounded-lg flex items-center justify-center hover:text-red-400" style={{background:"var(--bg-hover)",color:"var(--text-muted)"}}><Trash2 size={12}/></button>
+                          {canEdit&&<button onClick={()=>openEdit(p)} className="w-7 h-7 rounded-lg flex items-center justify-center" style={{background:"var(--bg-hover)",color:"var(--text-muted)"}}><Edit size={12}/></button>}
+                          {canDelete&&<button onClick={()=>handleDelete(p.id)} className="w-7 h-7 rounded-lg flex items-center justify-center hover:text-red-400" style={{background:"var(--bg-hover)",color:"var(--text-muted)"}}><Trash2 size={12}/></button>}
                         </div>
                       </td>
                     </tr>,
@@ -476,7 +522,7 @@ export default function InventoryPage() {
                 <tr style={{borderTop:"2px solid var(--border)",background:"var(--bg-hover)"}}>
                   <td colSpan={6} className="p-3"><span className="text-xs font-bold uppercase tracking-wider" style={{color:"var(--text-muted)"}}>{filtered.length} of {products.length} products</span></td>
                   <td className="p-3"><span className="text-xs font-bold" style={{color:"var(--text-primary)"}}>{totalUnits.toLocaleString()} units</span></td>
-                  <td colSpan={2} className="p-3"><span className="text-xs font-bold text-green-400">{format(stockValue.toLocaleString())}</span></td>
+                  <td colSpan={2} className="p-3"><span className="text-xs font-bold text-green-400">{format(stockValue)}</span></td>
                 </tr>
               </tfoot>
             </table>
