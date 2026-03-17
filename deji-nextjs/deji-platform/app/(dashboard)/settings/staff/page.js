@@ -628,7 +628,7 @@ export default function StaffPage() {
                 style={{ background:"rgba(34,197,94,0.06)", border:"1px solid rgba(34,197,94,0.15)" }}>
                 <Send size={13} style={{ color:"#22c55e", flexShrink:0, marginTop:1 }}/>
                 <p className="text-xs" style={{ color:"#86efac" }}>
-                  An invite email will be sent. They'll click the link to set their own password.
+                  An invite email will be sent. They&apos;ll click the link to set their own password.
                 </p>
               </div>
             )}

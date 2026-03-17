@@ -1079,7 +1079,7 @@ export default function FinancePage() {
               <div>
                 <label className="deji-label">Restock to Warehouse</label>
                 <select value={refundForm.restockWarehouseId} onChange={e=>setRefundForm(p=>({...p,restockWarehouseId:e.target.value}))} className="deji-input">
-                  <option value="">Don't restock inventory</option>
+                  <option value="">Don&apos;t restock inventory</option>
                   {warehouses.filter(w=>w.isActive!==false).map(w=><option key={w.id} value={w.id}>{w.isDefault?"⚡ ":""}{w.name} · {w.country}</option>)}
                 </select>
                 <p className="text-[10px] mt-1" style={{color:"var(--text-muted)"}}>Product quantities will be added back to this warehouse</p>
